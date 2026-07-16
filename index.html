@@ -85,6 +85,9 @@ body{
 .cutbig .cutd{font-size:15px;color:var(--ink-soft);font-weight:400;margin-left:10px}
 .cutrows{margin-top:12px;border-top:1px solid var(--rule)}
 .cutrows .cr{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #E2E7EA;font-family:var(--mono);font-size:15px}
+.steps{margin:14px 0 0;padding-left:22px;font-size:15px;line-height:1.6;color:var(--ink-soft)}
+.steps li{margin-bottom:8px}
+.steps b{color:var(--ink)}
 .cutrows .cr .ck{font-family:var(--cond);font-size:14px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);padding-top:1px}
 .dia{background:#fff;border:2px solid var(--rule);border-radius:3px;padding:8px;margin-bottom:16px}
 .dia svg{display:block;width:100%;height:auto}
@@ -259,23 +262,24 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
   <section class="panel">
     <h2>Fitting</h2>
     <div class="fits" id="fitPick">
-      <button type="button" data-v="two" aria-pressed="true"><span class="fT">Two elbows</span><span class="fS">Round or square radius-throat. S-offset.</span></button>
-      <button type="button" data-v="wye" aria-pressed="false"><span class="fT">Wye branch</span><span class="fS">45&deg; wye off the main, ell back to parallel.</span></button>
-      <button type="button" data-v="sqmit" aria-pressed="false"><span class="fT">Square mitered</span><span class="fS">Hard-corner ogee, no radius.</span></button>
+      <button type="button" data-v="twoR" aria-pressed="true"><span class="fT">Two elbows &middot; round</span><span class="fS">S-offset in spiral. Radius ells.</span></button>
+      <button type="button" data-v="twoS" aria-pressed="false"><span class="fT">Two elbows &middot; square</span><span class="fS">S-offset in rectangular. Radius-throat ells.</span></button>
+      <button type="button" data-v="wye" aria-pressed="false"><span class="fT">Wye branch</span><span class="fS">Tap off the main, ell back to parallel.</span></button>
+      <button type="button" data-v="single" aria-pressed="false"><span class="fT">Single elbow</span><span class="fS">One end already sits at the angle &mdash; a tap, a collar, a unit connection.</span></button>
+      <button type="button" data-v="owl" aria-pressed="false"><span class="fT">OWL &middot; cut &amp; flip</span><span class="fS">Field offset out of straight square duct. Two cuts, flip the middle.</span></button>
     </div>
   </section>
 
-  <div class="dia"><svg id="svg" viewBox="0 0 400 240" aria-label="Offset diagram"></svg></div>
+  <div class="dia"><svg id="svg" viewBox="0 0 400 260" aria-label="Offset diagram"></svg></div>
 
-  <section class="panel">
+  <section class="panel" id="ductPanel">
     <h2>Duct</h2>
-    <div class="seg" id="segOShape" role="group" aria-label="Round or square">
-      <button type="button" data-v="round" aria-pressed="true">Round</button>
-      <button type="button" data-v="square" aria-pressed="false">Square</button>
+    <div class="field" id="oDiaBox"><input id="oD" type="number" inputmode="decimal" size="1" value="12"><span class="unit" id="oDUnit">in round</span></div>
+    <div class="two" id="oRectBox" hidden>
+      <div class="field"><input id="oBend" type="number" inputmode="decimal" size="1" value="12"><span class="unit">in the bend</span></div>
+      <div class="x">&times;</div>
+      <div class="field"><input id="oOther" type="number" inputmode="decimal" size="1" value="20"><span class="unit">the other</span></div>
     </div>
-    <div class="field stack" id="oDiaBox"><input id="oD" type="number" inputmode="decimal" size="1" value="12"><span class="unit">in round</span></div>
-    <div class="field stack" id="oRectBox" hidden><input id="oDep" type="number" inputmode="decimal" size="1" value="12"><span class="unit">in, in the bend</span></div>
-
     <div id="wyeBox" hidden>
       <label class="lab" for="oTap">Tap size</label>
       <div class="field"><input id="oTap" type="number" inputmode="decimal" size="1" value="8"><span class="unit">in round</span></div>
@@ -285,21 +289,27 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       <div class="field"><input id="oFitLen" type="number" inputmode="decimal" size="1"><span class="unit">in on the main</span></div>
       <p class="tip" id="fitLenTip"></p>
     </div>
+    <div id="stubBox" hidden>
+      <label class="lab" for="oStub">Connection stub</label>
+      <div class="field"><input id="oStub" type="number" inputmode="decimal" size="1" value="2"><span class="unit">in past the angle</span></div>
+      <p class="tip">How much straight sticks out of whatever you're landing on &mdash; a tap collar, a unit flange. Zero if you're cutting right to it.</p>
+    </div>
   </section>
 
   <section class="panel" id="ellPanel">
     <h2>Elbow</h2>
     <div id="throatBox">
       <label class="lab" for="oThroat">Throat radius</label>
-      <div class="field"><input id="oThroat" type="number" inputmode="decimal" size="1" value="6"><span class="unit">in</span></div>
-      <div class="chips two-up" id="rChips"></div>
+      <div class="field"><input id="oThroat" type="number" inputmode="decimal" size="1"><span class="unit">in</span></div>
+      <div class="chips" id="rChips"></div>
+      <p class="tip" id="throatTip"></p>
     </div>
     <label class="lab">Angle</label>
     <div class="chips" id="angChips"></div>
     <div class="field"><input id="oAng" type="number" inputmode="decimal" step="1" size="1" value="45"><span class="unit">degrees</span></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="offPanel">
     <h2>Offset</h2>
     <div class="seg" id="segRoll" role="group" aria-label="Offset kind">
       <button type="button" data-v="flat" aria-pressed="true">Straight</button>
@@ -312,14 +322,28 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       <label class="lab" for="oV">Up or down</label>
       <div class="field"><input id="oV" type="number" inputmode="decimal" size="1" value="15"><span class="unit">in</span></div>
     </div>
+    <div id="owlBox" hidden>
+      <label class="lab" for="owlO">Offset needed</label>
+      <div class="field"><input id="owlO" type="number" inputmode="decimal" size="1" value="8"><span class="unit">in</span></div>
+      <label class="lab" for="owlM">Middle piece</label>
+      <div class="field"><input id="owlM" type="number" inputmode="decimal" size="1" value="30"><span class="unit">in between cuts</span></div>
+      <p class="tip">The middle piece is what flips. Longer middle = shallower cuts = easier break.</p>
+    </div>
     <p class="err" id="oErr" hidden></p>
   </section>
 
   <section class="panel cutp" id="cutPanel">
-    <h2>Your cut</h2>
+    <h2 id="cutTitle">Your cut</h2>
     <div class="cutbig"><span id="oCut">&mdash;</span><span class="cutd" id="oCutD"></span></div>
     <div class="cutrows" id="oRows"></div>
     <div class="roll" id="oRoll" hidden></div>
+    <ol class="steps" id="owlSteps" hidden>
+      <li>Square a line around the duct at each end of the middle piece.</li>
+      <li>From each line, measure the <b>layout mark</b> across the cheek &mdash; top corner to bottom corner &mdash; and strike the diagonal. <b>Both diagonals lean the same way.</b></li>
+      <li>Cut both lines, all four sides.</li>
+      <li>Flip the middle piece end for end. Don't rotate it &mdash; flip it like closing a book.</li>
+      <li>Fit it back in. The duct now steps over by your offset.</li>
+    </ol>
     <p class="tip" id="oHint"></p>
   </section>
 
@@ -568,10 +592,10 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
   paint();
 
   /* ================= OFFSET ================= */
-  var off = { fit:"two", shape:"round", roll:"flat" };
+  var off = { fit:"twoR", roll:"flat" };
   var ANGLES = [22.5, 30, 45, 60, 90];
   var WYE_LEN = {6:12,8:16,10:20,12:22,14:24,16:28,18:30,20:32,22:36,24:38,26:42,28:44};
-  var fitLenTouched = false;
+  var fitLenTouched = false, throatTouched = false;
 
   function frac(n){
     if(!isFinite(n)) return "\u2014";
@@ -599,6 +623,11 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     }
     return WYE_LEN[ks[0]];
   }
+  function bendDim(){
+    if(off.fit === "twoS" || off.fit === "owl") return num("oBend");
+    if(off.fit === "wye" || off.fit === "single") return num("oTap");
+    return num("oD");
+  }
   function syncFitLen(){
     if(fitLenTouched) return;
     var tap = num("oTap");
@@ -607,14 +636,40 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       $("fitLenTip").innerHTML = "Standard for a " + f1(tap) + "\u2033 tap. Change it if your shop runs different.";
     }
   }
+  function stdCL(){ return (off.fit === "twoS") ? 1.0 : 1.5; }
+  function syncThroat(){
+    if(throatTouched) return;
+    var D = bendDim();
+    if(D === null) return;
+    $("oThroat").value = +(stdCL()*D - D/2).toFixed(3);
+    throatTipTxt();
+  }
+  function throatTipTxt(){
+    var D = bendDim(), t = parseFloat($("oThroat").value);
+    if(D === null || !isFinite(t)){ $("throatTip").textContent = ""; return; }
+    var cl = t + D/2;
+    $("throatTip").innerHTML = "Centerline radius <b>" + frac(cl) + "</b> \u2014 a " + f1(cl/D) + "D ell.";
+  }
 
   function offCalc(){
+    if(off.fit === "owl"){
+      var Hc = num("oBend"), Oo = num("owlO"), Mm = num("owlM");
+      if(Hc === null) return { err:"Enter the side in the bend." };
+      if(Oo === null) return { err:"Enter the offset above zero." };
+      if(Mm === null) return { err:"Enter the middle piece length." };
+      if(Oo >= Mm) return { err:"Middle piece has to be longer than the offset \u2014 stretch it out." };
+      var th2 = Math.asin(Oo/Mm), a = th2/2;
+      return { owl:true, Hc:Hc, O:Oo, M:Mm, th:th2, a:a,
+               mark:Hc*Math.tan(a), runM:Mm*Math.cos(th2), lost:Mm - Mm*Math.cos(th2),
+               angDeg:th2*180/Math.PI };
+    }
+
     var angDeg = num("oAng");
     if(angDeg === null || angDeg >= 180) return { err:"Angle has to be between 0 and 180." };
     var th = angDeg*Math.PI/180;
 
     var O, rollAng = null, Hh, Vv;
-    if(off.roll === "flat"){
+    if(off.roll === "flat" || off.fit === "twoS"){
       O = num("oOff");
       if(O === null) return { err:"Enter the offset above zero." };
     } else {
@@ -627,39 +682,32 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     var run = Math.abs(angDeg - 90) < 1e-9 ? 0 : O/Math.tan(th);
     var base = { angDeg:angDeg, th:th, O:O, travel:travel, run:run, rollAng:rollAng, Hh:Hh, Vv:Vv };
 
-    if(off.fit === "two"){
-      var D = off.shape === "round" ? num("oD") : num("oDep");
-      if(D === null) return { err:"Enter the duct size above zero." };
-      var t0 = parseFloat($("oThroat").value);
-      if(!isFinite(t0) || t0 < 0) return { err:"Enter a throat radius." };
-      var R = t0 + D/2, tan = R*Math.tan(th/2);
-      base.D = D; base.R = R; base.tan = tan;
-      base.cut = travel - 2*tan;
-      base.arc = R*th;
-      base.overall = run + 2*tan;
+    var Db = bendDim();
+    if(Db === null) return { err:"Enter the duct size above zero." };
+    var t0 = parseFloat($("oThroat").value);
+    if(!isFinite(t0) || t0 < 0) return { err:"Enter a throat radius." };
+    var R = t0 + Db/2, tn = R*Math.tan(th/2);
+    base.D = Db; base.R = R; base.tan = tn; base.arc = R*th;
+
+    if(off.fit === "twoR" || off.fit === "twoS"){
+      base.cut = travel - 2*tn;
+      base.overall = run + 2*tn;
       return base;
     }
-    if(off.fit === "sqmit"){
-      var D2 = num("oDep");
-      if(D2 === null) return { err:"Enter the duct size above zero." };
-      base.D = D2; base.R = 0; base.tan = 0;
-      base.cut = travel; base.arc = 0; base.overall = run;
+    if(off.fit === "single"){
+      var stub = num("oStub"); if(stub === null) stub = 0;
+      base.stub = stub;
+      base.cut = travel - tn - stub;
+      base.overall = run + tn;
       return base;
     }
-    // wye branch: main + 45 wye + straight + radius ell back to parallel
-    var Dm = num("oD"), tap = num("oTap");
+    var Dm = num("oD");
     if(Dm === null) return { err:"Enter the main size above zero." };
-    if(tap === null) return { err:"Enter the tap size above zero." };
     var tapLen = num("oTapLen"); if(tapLen === null) tapLen = 6;
-    var fitLen = num("oFitLen"); if(fitLen === null) fitLen = wyeStd(tap);
-    var t1 = parseFloat($("oThroat").value);
-    if(!isFinite(t1) || t1 < 0) return { err:"Enter a throat radius." };
-    var Rt = t1 + tap/2, tant = Rt*Math.tan(th/2);
-    base.D = Dm; base.tap = tap; base.tapLen = tapLen; base.fitLen = fitLen;
-    base.R = Rt; base.tan = tant;
-    base.cut = travel - tapLen - tant;
-    base.arc = Rt*th;
-    base.overall = run + tant;      // from body CL to the far end of the ell tangent
+    var fitLen = num("oFitLen"); if(fitLen === null) fitLen = wyeStd(Db);
+    base.main = Dm; base.tapLen = tapLen; base.fitLen = fitLen;
+    base.cut = travel - tapLen - tn;
+    base.overall = run + tn;
     return base;
   }
 
@@ -672,6 +720,7 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
   function offPaint(){
     var r = offCalc();
     $("oErr").hidden = !r.err;
+    $("owlSteps").hidden = true;
     if(r.err){
       $("oErr").textContent = r.err;
       $("oCut").innerHTML = "&mdash;"; $("oCutD").textContent = "";
@@ -679,11 +728,30 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       $("svg").innerHTML = "";
       return;
     }
+    throatTipTxt();
+
+    if(r.owl){
+      $("cutTitle").textContent = "Your layout";
+      $("oCut").textContent = frac(r.mark);
+      $("oCutD").textContent = "layout mark \u00B7 " + r.mark.toFixed(3) + '"';
+      rows([
+        ["Cut angle", (r.a*180/Math.PI).toFixed(1) + "\u00B0 off square"],
+        ["Duct turns", r.angDeg.toFixed(1) + "\u00B0 and back"],
+        ["Middle covers", frac(r.runM) + " of run"],
+        ["Length lost", frac(r.lost)]
+      ]);
+      $("owlSteps").hidden = false;
+      $("oRoll").hidden = true;
+      $("oHint").innerHTML = "The mark is how far the diagonal walks across the cheek \u2014 square line at the top corner, " + frac(r.mark) + " over at the bottom.";
+      draw(r);
+      return;
+    }
+
+    $("cutTitle").textContent = "Your cut";
     $("oCut").textContent = frac(r.cut);
     $("oCutD").textContent = r.cut.toFixed(3) + '"';
-
     var list = [["Travel", frac(r.travel)]];
-    if(off.fit === "two"){
+    if(off.fit === "twoR" || off.fit === "twoS"){
       list.push(["Ell tangent \u00D72", frac(r.tan) + " each"]);
       list.push(["Ell arc (CL)", frac(r.arc)]);
       list.push(["Run gained", frac(r.run)]);
@@ -691,10 +759,14 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       $("oHint").innerHTML = r.cut < 0
         ? "\u26A0 Negative \u2014 the ells overlap. Tighten the throat or open the angle."
         : "Cut is the straight piece between the two ells. Centerline \u2014 add seam and joint allowance.";
-    } else if(off.fit === "sqmit"){
+    } else if(off.fit === "single"){
+      list.push(["Ell tangent", frac(r.tan)]);
+      list.push(["Connection stub", frac(r.stub)]);
+      list.push(["Ell arc (CL)", frac(r.arc)]);
       list.push(["Run gained", frac(r.run)]);
-      list.push(["Miter cut each end", (r.angDeg/2).toFixed(1) + "\u00B0"]);
-      $("oHint").innerHTML = "Hard corners \u2014 the cut is the whole travel, mitered " + (r.angDeg/2).toFixed(1) + "\u00B0 each end. Centerline; add seam and joint allowance.";
+      $("oHint").innerHTML = r.cut < 0
+        ? "\u26A0 Negative \u2014 no room between the ell and the connection. Open the angle or lose the stub."
+        : "Cut is the straight between the connection and the ell.";
     } else {
       list.push(["Tap stub", frac(r.tapLen)]);
       list.push(["Ell tangent", frac(r.tan)]);
@@ -702,13 +774,13 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       list.push(["Run gained", frac(r.run)]);
       list.push(["Wye fitting length", frac(r.fitLen)]);
       $("oHint").innerHTML = r.cut < 0
-        ? "\u26A0 Negative \u2014 the offset is shorter than the tap and ell alone. Move the wye or open the angle."
-        : "Cut is the straight between the wye tap and the ell. Travel runs body centerline to branch centerline.";
+        ? "\u26A0 Negative \u2014 the offset is shorter than the tap and ell alone. Open the angle."
+        : "Cut is the straight between the wye tap and the ell. Travel runs main centerline to branch centerline.";
     }
     rows(list);
 
     if(r.rollAng !== null){
-      var mark = (off.shape === "round" || off.fit === "wye") ? (r.rollAng/360)*Math.PI*(r.tap || r.D) : null;
+      var mark = off.fit === "twoS" ? null : (r.rollAng/360)*Math.PI*r.D;
       $("oRoll").hidden = false;
       $("oRoll").innerHTML =
         "True offset <b>" + frac(r.O) + "</b> from " + frac(r.Hh) + " sideways and " + frac(r.Vv) + " up<br>" +
@@ -719,91 +791,154 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     draw(r);
   }
 
-  /* ---------- diagrams: one per fitting ---------- */
+  /* ---------- diagrams ---------- */
   function draw(r){
-    var W = 400, Ht = 240, pad = 30;
+    var W = 400, Ht = 260, pad = 34;
     var g = [], sc, ox, oy;
     function X(x){ return ox + x*sc; }
-    function Y(y){ return oy + y*sc; }
-    function duct(d){ g.push('<path d="' + d + '" fill="none" stroke="#C9D1D6" stroke-width="' + Math.max(3,(r.D||8)*sc) + '" stroke-linecap="butt"/>'); }
-    function cl(d){ g.push('<path d="' + d + '" fill="none" stroke="#030D8C" stroke-width="1.6" stroke-dasharray="7 4"/>'); }
-    function dot(x,y){ g.push('<circle cx="' + X(x) + '" cy="' + Y(y) + '" r="2.6" fill="#FF6A13"/>'); }
-    function label(x,y,t,anchor,cls){
-      g.push('<text x="' + x + '" y="' + y + '" text-anchor="' + (anchor||"middle") + '" font-family="monospace" font-size="' + (cls==="big"?12:10.5) + '"' + (cls==="big"?' font-weight="bold" fill="#B3541E"':' fill="#0F1A22"') + '>' + t + '</text>');
+    var square = (off.fit === "twoS" || off.fit === "owl");
+    function duct(d, size){
+      var wpx = Math.max(4, size*sc);
+      g.push('<path d="' + d + '" fill="none" stroke="#9AA7B1" stroke-width="' + wpx + '" stroke-linecap="butt"/>');
+      if(square){
+        g.push('<path d="' + d + '" fill="none" stroke="#F4F6F8" stroke-width="' + Math.max(1,wpx-5) + '" stroke-linecap="butt"/>');
+      } else {
+        g.push('<path d="' + d + '" fill="none" stroke="#C9D1D6" stroke-width="' + Math.max(1,wpx-2.5) + '" stroke-linecap="butt"/>');
+        g.push('<path d="' + d + '" fill="none" stroke="#E9EDF0" stroke-width="' + Math.max(1,wpx*0.30) + '" stroke-linecap="butt"/>');
+      }
     }
-    var th = r.th, O = r.O;
+    function cl(d){ g.push('<path d="' + d + '" fill="none" stroke="#030D8C" stroke-width="1.5" stroke-dasharray="7 4"/>'); }
+    function dot(px,py){ g.push('<circle cx="' + px + '" cy="' + py + '" r="2.7" fill="#FF6A13"/>'); }
+    function txt(px,py,t,anchor,big,color){
+      g.push('<text x="' + px + '" y="' + py + '" text-anchor="' + (anchor||"middle") +
+        '" font-family="monospace" font-size="' + (big?12.5:10.5) + '"' +
+        (big?' font-weight="bold"':'') + ' fill="' + (color||(big?"#B3541E":"#0F1A22")) + '">' + t + '</text>');
+    }
+    function dimline(x1,y1,x2,y2){
+      g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#0F1A22" stroke-width="1"/>');
+      var vx = (y2-y1), vy = -(x2-x1), L = Math.hypot(vx,vy)||1; vx/=L; vy/=L;
+      [[x1,y1],[x2,y2]].forEach(function(p){
+        g.push('<line x1="' + (p[0]-vx*4) + '" y1="' + (p[1]-vy*4) + '" x2="' + (p[0]+vx*4) + '" y2="' + (p[1]+vy*4) + '" stroke="#0F1A22" stroke-width="1"/>');
+      });
+    }
 
-    if(off.fit === "wye"){
-      var main = Math.max(r.fitLen*1.4, 40), bx0 = 0, bx1 = main;
-      var wx = main*0.42;                                  // wye CL on the body
-      var dxn = Math.cos(th), dyn = -Math.sin(th);
+    if(r.owl){
+      var Hc = r.Hc, M = r.M, lead = Math.max(M*0.3, Hc*1.1);
+      var total = M + 2*lead + r.mark;
+      sc = (W - 2*pad)/total;
+      ox = pad; var yTop = 66;
+      var mk = r.mark, c1 = lead, c2 = lead + M;
+      // 1. layout view
+      duct("M" + X(0) + "," + yTop + "L" + X(total) + "," + yTop, Hc);
+      [[c1],[c2]].forEach(function(cc){
+        var c = cc[0];
+        g.push('<line x1="' + X(c) + '" y1="' + (yTop-Hc/2*sc) + '" x2="' + X(c) + '" y2="' + (yTop+Hc/2*sc) + '" stroke="#54646F" stroke-width="1" stroke-dasharray="3 3"/>');
+        g.push('<line x1="' + X(c) + '" y1="' + (yTop-Hc/2*sc) + '" x2="' + X(c+mk) + '" y2="' + (yTop+Hc/2*sc) + '" stroke="#B3541E" stroke-width="2.2"/>');
+      });
+      dimline(X(c1), yTop+Hc/2*sc+9, X(c1+mk), yTop+Hc/2*sc+9);
+      txt((X(c1)+X(c1+mk))/2, yTop+Hc/2*sc+22, "mark " + frac(mk), "middle", true);
+      dimline(X(c1), yTop-Hc/2*sc-9, X(c2), yTop-Hc/2*sc-9);
+      txt((X(c1)+X(c2))/2, yTop-Hc/2*sc-14, "middle " + frac(M));
+      txt((X(c1)+X(c2))/2 + mk*sc/2, yTop+4, "FLIP END FOR END", "middle", false, "#030D8C");
+      txt(X(0), yTop-Hc/2*sc-32, "1 \u00B7 LAY OUT \u2014 both diagonals lean the same way", "start", false, "#030D8C");
+      // 2. after view
+      var yB = 196;
+      var p1 = lead, p2 = lead + r.runM;
+      var path2 = "M" + X(0) + "," + (yB + r.O*sc) + "L" + X(p1) + "," + (yB + r.O*sc) +
+                  "L" + X(p2) + "," + yB + "L" + X(total - r.lost) + "," + yB;
+      duct(path2, Hc);
+      cl(path2);
+      dimline(X(0)-11, yB, X(0)-11, yB + r.O*sc);
+      txt(X(0)-15, yB + r.O*sc/2 + 4, frac(r.O), "end", true, "#030D8C");
+      dimline(X(p1), yB + r.O*sc + Hc/2*sc + 10, X(p2), yB + r.O*sc + Hc/2*sc + 10);
+      txt((X(p1)+X(p2))/2, yB + r.O*sc + Hc/2*sc + 23, "covers " + frac(r.runM));
+      txt(X(0), yB - Hc/2*sc - 12, "2 \u00B7 AFTER THE FLIP", "start", false, "#030D8C");
+      txt(X(p1)+8, yB + r.O*sc - 5, r.angDeg.toFixed(1) + "\u00B0", "start");
+      var svg0 = $("svg");
+      svg0.setAttribute("viewBox", "-14 -6 " + (W+28) + " " + (Ht+30));
+      svg0.innerHTML = g.join("");
+      return;
+    }
+
+    var th = r.th, O = r.O;
+    if(off.fit === "wye" || off.fit === "single"){
+      var isW = off.fit === "wye";
+      var mainD = isW ? r.main : Math.max(r.D*1.5, r.D + 4);
+      var fl = isW ? r.fitLen : 0;
       var Tt = r.tan;
-      var pB = [wx + r.travel*dxn, 0 - r.travel*(-dyn)];   // branch PI (end of travel)
-      pB = [wx + r.travel*Math.cos(th), -O];
-      var tS = [wx + r.tapLen*Math.cos(th), -r.tapLen*Math.sin(th)];
+      var startLen = isW ? r.tapLen : r.stub;
+      var pBx = 0.0, wx;
+      var reach = r.travel*Math.cos(th) + Tt + r.D*1.2;
+      wx = Math.max(isW ? fl*0.75 : r.D, 10);
+      var main = wx + Math.max(reach, isW ? fl*0.75 : r.D) ;
+      var pB = [wx + r.travel*Math.cos(th), -O];
+      var tS = [wx + startLen*Math.cos(th), -startLen*Math.sin(th)];
       var tE = [pB[0] - Tt*Math.cos(th), pB[1] + Tt*Math.sin(th)];
       var t4 = [pB[0] + Tt, -O];
-      var end = [Math.max(t4[0] + (r.D||8)*1.2, bx1), -O];
-      var gx = Math.max(bx1, end[0]) - bx0, gyTop = -O - (r.tap||6), gyBot = (r.D||8);
+      var endx = Math.max(t4[0] + r.D*1.2, main);
+      var gx = endx;
+      var gyTop = -O - r.D, gyBot = mainD;
       sc = Math.min((W-2*pad)/gx, (Ht-2*pad)/(gyBot-gyTop));
-      ox = (W - gx*sc)/2 - bx0*sc; oy = (Ht - (gyBot-gyTop)*sc)/2 - gyTop*sc;
+      ox = (W - gx*sc)/2; oy = (Ht - (gyBot-gyTop)*sc)/2 - gyTop*sc;
+      function Y(y){ return oy + y*sc; }
 
-      // body
-      g.push('<path d="M' + X(bx0) + ',' + Y(0) + 'L' + X(bx1) + ',' + Y(0) + '" fill="none" stroke="#C9D1D6" stroke-width="' + (r.D*sc) + '"/>');
-      // fitting length ticks on the body
-      var fl0 = wx - r.fitLen/2, fl1 = wx + r.fitLen/2;
-      g.push('<line x1="' + X(fl0) + '" y1="' + (Y(0)-r.D/2*sc-4) + '" x2="' + X(fl0) + '" y2="' + (Y(0)+r.D/2*sc+4) + '" stroke="#54646F" stroke-width="1"/>');
-      g.push('<line x1="' + X(fl1) + '" y1="' + (Y(0)-r.D/2*sc-4) + '" x2="' + X(fl1) + '" y2="' + (Y(0)+r.D/2*sc+4) + '" stroke="#54646F" stroke-width="1"/>');
-      label((X(fl0)+X(fl1))/2, Y(0)+r.D/2*sc+16, "fitting " + frac(r.fitLen));
-      // branch: tap stub + cut + ell + horizontal out
-      var branch = 'M' + X(wx) + ',' + Y(0) + 'L' + X(tE[0]) + ',' + Y(tE[1]);
-      g.push('<path d="' + branch + '" fill="none" stroke="#C9D1D6" stroke-width="' + ((r.tap||6)*sc) + '"/>');
+      duct("M" + X(0) + "," + Y(0) + "L" + X(main) + "," + Y(0), mainD);
+      if(isW){
+        var fl0 = wx - fl/2, fl1 = wx + fl/2;
+        [fl0,fl1].forEach(function(fx){
+          g.push('<line x1="' + X(fx) + '" y1="' + (Y(0)-mainD/2*sc-4) + '" x2="' + X(fx) + '" y2="' + (Y(0)+mainD/2*sc+4) + '" stroke="#54646F" stroke-width="1"/>');
+        });
+        dimline(X(fl0), Y(0)+mainD/2*sc+10, X(fl1), Y(0)+mainD/2*sc+10);
+        txt((X(fl0)+X(fl1))/2, Y(0)+mainD/2*sc+23, "fitting " + frac(fl));
+      }
       var rp = r.R*sc;
-      g.push('<path d="M' + X(tE[0]) + ',' + Y(tE[1]) + 'A' + rp + ',' + rp + ' 0 0 1 ' + X(t4[0]) + ',' + Y(t4[1]) + 'L' + X(end[0]) + ',' + Y(end[1]) + '" fill="none" stroke="#C9D1D6" stroke-width="' + ((r.tap||6)*sc) + '"/>');
-      cl('M' + X(wx) + ',' + Y(0) + 'L' + X(tE[0]) + ',' + Y(tE[1]) + 'A' + rp + ',' + rp + ' 0 0 1 ' + X(t4[0]) + ',' + Y(t4[1]) + 'L' + X(end[0]) + ',' + Y(end[1]));
-      cl('M' + X(bx0) + ',' + Y(0) + 'L' + X(bx1) + ',' + Y(0));
-      dot(tS[0],tS[1]); dot(tE[0],tE[1]);
-      var mid = [(tS[0]+tE[0])/2,(tS[1]+tE[1])/2];
-      label(X(mid[0])+8, Y(mid[1])-((r.tap||6)/2*sc)-7, "cut " + frac(r.cut), "start", "big");
-      label(X(wx)-6, Y(-O/2), frac(O), "end");
-      g.push('<line x1="' + X(wx)-0 + '" y1="' + Y(0) + '" x2="' + X(wx) + '" y2="' + Y(-O) + '" stroke="#0F1A22" stroke-width="1" stroke-dasharray="3 3"/>');
-      label(X(wx)+16, Y(0)-5, r.angDeg + "\u00B0", "start");
+      var branchPath = "M" + X(wx) + "," + Y(0) + "L" + X(tE[0]) + "," + Y(tE[1]) +
+                       "A" + rp + "," + rp + " 0 0 1 " + X(t4[0]) + "," + Y(t4[1]) +
+                       "L" + X(endx) + "," + Y(-O);
+      duct(branchPath, r.D);
+      cl(branchPath);
+      cl("M" + X(0) + "," + Y(0) + "L" + X(main) + "," + Y(0));
+      dot(X(tS[0]),Y(tS[1])); dot(X(tE[0]),Y(tE[1]));
+      var midCut = [(tS[0]+tE[0])/2,(tS[1]+tE[1])/2];
+      txt(X(midCut[0])+10, Y(midCut[1])-r.D/2*sc-8, "cut " + frac(r.cut), "start", true);
+      var midStub = [(wx+tS[0])/2, -startLen*Math.sin(th)/2];
+      if(startLen > 0.01) txt(X(midStub[0])+9, Y(midStub[1])+16, (isW?"tap ":"stub ") + frac(startLen), "start");
+      txt(X(tE[0])+12, Y(tE[1])-3, "T " + frac(Tt), "start");
+      g.push('<line x1="' + X(wx) + '" y1="' + Y(0) + '" x2="' + X(wx) + '" y2="' + Y(-O) + '" stroke="#0F1A22" stroke-width="1" stroke-dasharray="3 3"/>');
+      txt(X(wx)-6, (Y(0)+Y(-O))/2+4, frac(O), "end", true, "#030D8C");
+      dimline(X(wx), Y(-O)-r.D/2*sc-9, X(pB[0]), Y(-O)-r.D/2*sc-9);
+      txt((X(wx)+X(pB[0]))/2, Y(-O)-r.D/2*sc-14, "run " + frac(r.run));
+      txt(X(wx)+18, Y(0)-6, r.angDeg + "\u00B0", "start");
     } else {
-      // two-elbow S (radius or hard-corner)
       var R = r.R, T2 = r.tan;
       var lead = Math.max(T2 + r.D, O*0.3, r.D*1.2);
       var gx2 = r.run + 2*lead;
-      sc = Math.min((W-2*pad)/Math.max(gx2,0.001), (Ht-2*pad)/(O + r.D));
-      ox = (W - gx2*sc)/2; oy = (Ht - (O + r.D)*sc)/2 + r.D/2*sc;
+      sc = Math.min((W-2*pad)/Math.max(gx2,0.001), (Ht-2*pad)/(O + r.D*1.6));
+      ox = (W - gx2*sc)/2;
+      var yBase = (Ht + (O + r.D*0.6)*sc)/2;
+      function YY(y){ return yBase - y*sc; }
       var p1x = lead, p2x = lead + r.run;
-      var dx2 = Math.cos(th), dy2 = -Math.sin(th);
-      var q1 = [p1x - T2, O], q2 = [p1x + T2*dx2, O + T2*dy2];
-      var q3 = [p2x - T2*dx2, 0 - T2*dy2], q4 = [p2x + T2, 0];
-      var d2;
-      if(R <= 0.0001){
-        d2 = "M" + X(0) + "," + Y(O) + "L" + X(p1x) + "," + Y(O) + "L" + X(p2x) + "," + Y(0) + "L" + X(gx2) + "," + Y(0);
-      } else {
-        var rp2 = R*sc;
-        d2 = "M" + X(0) + "," + Y(O) + "L" + X(q1[0]) + "," + Y(q1[1]) +
-             "A" + rp2 + "," + rp2 + " 0 0 0 " + X(q2[0]) + "," + Y(q2[1]) +
-             "L" + X(q3[0]) + "," + Y(q3[1]) +
-             "A" + rp2 + "," + rp2 + " 0 0 1 " + X(q4[0]) + "," + Y(q4[1]) +
-             "L" + X(gx2) + "," + Y(0);
-      }
-      duct(d2); cl(d2);
-      if(R > 0.0001){ [q1,q2,q3,q4].forEach(function(p){ dot(p[0],p[1]); }); }
-      else { dot(p1x,O); dot(p2x,0); }
-      g.push('<line x1="' + X(-2) + '" y1="' + Y(0) + '" x2="' + X(-2) + '" y2="' + Y(O) + '" stroke="#0F1A22" stroke-width="1"/>');
-      label(X(-2)-4, (Y(0)+Y(O))/2, frac(O), "end");
-      g.push('<line x1="' + X(p1x) + '" y1="' + (Y(O)+16) + '" x2="' + X(p2x) + '" y2="' + (Y(O)+16) + '" stroke="#0F1A22" stroke-width="1"/>');
-      label((X(p1x)+X(p2x))/2, Y(O)+29, "run " + frac(r.run));
-      var m2 = R > 0.0001 ? [(q2[0]+q3[0])/2,(q2[1]+q3[1])/2] : [(p1x+p2x)/2,O/2];
-      label(X(m2[0]), Y(m2[1])-r.D/2*sc-7, "cut " + frac(r.cut), "middle", "big");
-      if(off.fit === "sqmit") label(X(p1x), Y(O)+3, (r.angDeg/2).toFixed(1) + "\u00B0 miter", "middle");
-      else label(X(p1x), Y(O)+3, r.angDeg + "\u00B0", "middle");
+      var q1 = [p1x - T2, 0], q2 = [p1x + T2*Math.cos(th), T2*Math.sin(th)];
+      var q3 = [p2x - T2*Math.cos(th), O - T2*Math.sin(th)], q4 = [p2x + T2, O];
+      var rp2 = R*sc;
+      var d3 = "M" + X(0) + "," + YY(0) + "L" + X(q1[0]) + "," + YY(q1[1]) +
+               "A" + rp2 + "," + rp2 + " 0 0 0 " + X(q2[0]) + "," + YY(q2[1]) +
+               "L" + X(q3[0]) + "," + YY(q3[1]) +
+               "A" + rp2 + "," + rp2 + " 0 0 1 " + X(q4[0]) + "," + YY(q4[1]) +
+               "L" + X(gx2) + "," + YY(O);
+      duct(d3, r.D); cl(d3);
+      [q1,q2,q3,q4].forEach(function(p){ dot(X(p[0]), YY(p[1])); });
+      dimline(X(0)-12, YY(0), X(0)-12, YY(O));
+      txt(X(0)-16, (YY(0)+YY(O))/2+4, frac(O), "end", true, "#030D8C");
+      dimline(X(p1x), YY(0)+r.D/2*sc+13, X(p2x), YY(0)+r.D/2*sc+13);
+      txt((X(p1x)+X(p2x))/2, YY(0)+r.D/2*sc+26, "run " + frac(r.run));
+      var m3 = [(q2[0]+q3[0])/2,(q2[1]+q3[1])/2];
+      txt(X(m3[0])+8, YY(m3[1])-r.D/2*sc-8, "cut " + frac(r.cut), "start", true);
+      txt(X(q1[0])-4, YY(q1[1])-r.D/2*sc-7, "T " + frac(T2), "end");
+      txt(X(p1x)+6, YY(0)+4, r.angDeg + "\u00B0", "start");
     }
     var svg = $("svg");
-    svg.setAttribute("viewBox", "-46 -14 " + (W+60) + " " + (Ht+50));
+    svg.setAttribute("viewBox", "-40 -14 " + (W+70) + " " + (Ht+46));
     svg.innerHTML = g.join("");
   }
 
@@ -822,19 +957,23 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
   }
   function syncFit(){
     var f = off.fit;
-    $("segOShape").hidden = f === "wye" || f === "sqmit";              // shape is fixed for those
-    if(f === "wye"){ off.shape = "round"; }
-    if(f === "sqmit"){ off.shape = "square"; }
-    $("oDiaBox").hidden  = !(f === "wye" || (f === "two" && off.shape === "round"));
-    $("oRectBox").hidden = !((f === "two" && off.shape === "square") || f === "sqmit");
+    $("oDiaBox").hidden  = !(f === "twoR" || f === "wye" || f === "single");
+    $("oDUnit").textContent = f === "wye" ? "in round main" : "in round";
+    $("oRectBox").hidden = !(f === "twoS" || f === "owl");
     $("wyeBox").hidden   = f !== "wye";
-    $("ellPanel").hidden = false;
-    $("throatBox").hidden = f === "sqmit";
-    if(f === "wye"){ $("oAng").value = 45; syncAng(); }
+    $("stubBox").hidden  = f !== "single";
+    $("ellPanel").hidden = f === "owl";
+    var noRoll = (f === "twoS" || f === "owl");
+    $("segRoll").hidden  = noRoll;
+    if(noRoll) off.roll = "flat";
+    $("flatBox").hidden  = f === "owl" || off.roll !== "flat";
+    $("rollBox").hidden  = f === "owl" || off.roll !== "roll";
+    $("owlBox").hidden   = f !== "owl";
     syncFitLen();
+    throatTouched = false;
+    syncThroat();
   }
   oseg("fitPick","fit", syncFit);
-  oseg("segOShape","shape", syncFit);
   oseg("segRoll","roll", function(){
     $("flatBox").hidden = off.roll !== "flat";
     $("rollBox").hidden = off.roll !== "roll";
@@ -855,26 +994,30 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     });
   }
   var rc = $("rChips");
-  [["1.0D","One diameter"],["1.5D","Sweep"]].forEach(function(pp,i){
+  [["1D","standard square"],["1.5D","standard round"],["2D","long sweep"]].forEach(function(pp,i){
     var b = document.createElement("button");
     b.type = "button";
     b.innerHTML = '<span class="n">' + pp[0] + '</span><span class="t">' + pp[1] + '</span>';
     b.addEventListener("click", function(){
-      var D = off.fit === "wye" ? num("oTap") : (off.shape === "round" ? num("oD") : num("oDep"));
+      var D = bendDim();
       if(D === null) return;
-      $("oThroat").value = +((i === 0 ? 1.0 : 1.5)*D - D/2).toFixed(3);
+      var ratio = [1.0,1.5,2.0][i];
+      $("oThroat").value = +(ratio*D - D/2).toFixed(3);
+      throatTouched = true;
       offPaint();
     });
     rc.appendChild(b);
   });
 
-  ["oD","oDep","oTap","oTapLen","oThroat","oAng","oOff","oH","oV"].forEach(function(id){
+  ["oD","oBend","oOther","oTap","oTapLen","oStub","oAng","oOff","oH","oV","owlO","owlM"].forEach(function(id){
     $(id).addEventListener("input", function(){
       if(id === "oAng") syncAng();
-      if(id === "oTap") syncFitLen();
+      if(id === "oTap"){ syncFitLen(); syncThroat(); }
+      if(id === "oD" || id === "oBend") syncThroat();
       offPaint();
     });
   });
+  $("oThroat").addEventListener("input", function(){ throatTouched = true; offPaint(); });
   $("oFitLen").addEventListener("input", function(){ fitLenTouched = true; offPaint(); });
 
   /* ---------- nav ---------- */
@@ -901,6 +1044,7 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
   syncFit();
   offPaint();
   go("home");
+
 })();
 </script>
 </body>
