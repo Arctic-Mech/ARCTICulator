@@ -337,6 +337,12 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       <div class="field"><input id="oV" type="number" inputmode="decimal" size="1" value="15"><span class="unit">in</span></div>
     </div>
     <div id="owlBox" hidden>
+      <label class="lab">Method</label>
+      <div class="seg" id="segMeth" role="group" aria-label="Offset method">
+        <button type="button" data-v="endcut" aria-pressed="true">End cuts</button>
+        <button type="button" data-v="flip" aria-pressed="false">Cut &amp; flip</button>
+      </div>
+      <p class="tip" id="methTip"></p>
       <label class="lab" for="owlO">Offset needed</label>
       <div class="field"><input id="owlO" type="number" inputmode="decimal" size="1" value="8"><span class="unit">in</span></div>
       <label class="lab">Length I'm working from</label>
@@ -346,6 +352,7 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       </div>
       <div class="field stack"><input id="owlLen" type="number" inputmode="decimal" size="1" value="96"><span class="unit" id="owlLenU">in stock</span></div>
       <p class="tip" id="owlLenTip"></p>
+      <div id="connBox">
       <label class="lab">End connection</label>
       <div class="seg" id="segEnd" role="group" aria-label="End connection">
         <button type="button" data-v="raw" aria-pressed="true">S &amp; drive</button>
@@ -354,6 +361,7 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       <label class="lab" for="owlEnd">Straight each end</label>
       <div class="field"><input id="owlEnd" type="number" inputmode="decimal" step="0.25" size="1" value="1"><span class="unit">in for the connection</span></div>
       <p class="tip" id="endTip"></p>
+      </div>
     </div>
     <p class="err" id="oErr" hidden></p>
   </section>
@@ -630,9 +638,18 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
   paint();
 
   /* ================= OFFSET ================= */
-  var off = { fit:"twoR", roll:"flat", lenMode:"stock", endConn:"raw" };
+  var off = { fit:"twoR", roll:"flat", lenMode:"stock", endConn:"raw", method:"endcut" };
   var tutOn = false, tutStep = 1, tutR = null;
   function tutTextFor(n, r){
+    if(r.endcut){
+      switch(n){
+        case 1: return (r.lenMode === "stock" ? "Your <b>" + frac(r.blank) + "</b> stick." : "Cut a <b>" + frac(r.blank) + "</b> blank.") + " Lay it flat, cheek up.";
+        case 2: return "<b>First cut.</b> Mark <b>" + frac(r.mark) + "</b> along the edge and strike the diagonal. The wedge comes off the <b>bottom</b> corner.";
+        case 3: return "<b>Second cut \u2014 parallel, not mirrored.</b> Same " + frac(r.mark) + " mark, same lean, other end. This wedge comes off the <b>top</b> corner \u2014 opposite sides.";
+        case 4: return "Tilt it in <b>" + r.angDeg.toFixed(1) + "\u00B0</b>. The cut faces sit plumb \u2014 square to both connections \u2014 and it steps over <b>" + frac(r.O) + "</b>. No collars, no flip.";
+      }
+      return "";
+    }
     var m = frac(r.mark), M = frac(r.M), O = frac(r.O), e = frac(r.endAllow), stk = frac(r.stock);
     var conn = r.tdc ? "TDC frame" : "S&drive";
     switch(n){
@@ -649,7 +666,8 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
   }
   function tutRender(){
     if(!tutR) return;
-    $("tutStep").textContent = "Step " + tutStep + " of 6";
+    var tutMax = tutR && tutR.endcut ? 4 : 6;
+    $("tutStep").textContent = "Step " + tutStep + " of " + tutMax;
     $("tutText").innerHTML = tutTextFor(tutStep, tutR);
     $("tutPrev").disabled = tutStep <= 1;
     $("tutNext").textContent = tutStep >= 6 ? "Done" : "Next ›";
@@ -737,6 +755,14 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       if(Oo === null) return { err:"Enter the offset above zero." };
       if(Ln === null) return { err:"Enter the length." };
       var lenMode = off.lenMode || "stock";
+      if((off.method || "endcut") === "endcut"){
+        var ec = endcutSolve(lenMode, Ln, Oo, Hc);
+        if(!ec) return { err: "That stick can't tilt far enough for the offset \u2014 use Cut & flip." };
+        return { owl:true, endcut:true, Hc:Hc, O:Oo, th:ec.th, angDeg:ec.th*180/Math.PI,
+                 mark:ec.mark, R:ec.R, blank:ec.blank, lenMode:lenMode,
+                 stock:ec.blank, endLen:ec.R, tdc:(off.endConn === "tdc"),
+                 edge:ec.R/Math.cos(ec.th), open:Hc/Math.cos(ec.th) };
+      }
       var e = num("owlEnd"); if(e === null) e = 1;
       var s = owlSolve(lenMode, Ln, Oo, e);
       if(!s) return { err: lenMode === "stock"
@@ -811,6 +837,22 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     return base;
   }
 
+  function endcutSolve(mode, Ln, O, H){
+    if(mode === "end"){
+      var th = Math.atan2(O, Ln);
+      return { th:th, mark:H*Math.tan(th), R:Ln, blank:Ln/Math.cos(th) + H*Math.tan(th) };
+    }
+    // stock: solve (L - H tan t) sin t = O on the rising branch
+    function f(t){ return (Ln - H*Math.tan(t))*Math.sin(t) - O; }
+    var a=1e-6, b=Math.atan2(Ln,H)*0.999, i, m1, m2;
+    for(i=0;i<60;i++){ m1=a+(b-a)/3; m2=b-(b-a)/3; if(f(m1)<f(m2)) a=m1; else b=m2; }
+    var peak=(a+b)/2;
+    if(f(peak) < 0) return null;
+    var lo=1e-6, hi=peak, m;
+    for(i=0;i<80;i++){ m=(lo+hi)/2; if(f(m)<0) lo=m; else hi=m; }
+    var th2=(lo+hi)/2;
+    return { th:th2, mark:H*Math.tan(th2), R:(Ln - H*Math.tan(th2))*Math.cos(th2), blank:Ln };
+  }
   function owlSolve(mode, L, O, e){
     var M, th, stock, endLen;
     if(mode === "stock"){
@@ -823,6 +865,13 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       M = Math.sqrt(O*O + hz*hz); th = Math.atan2(O, hz); stock = M + 2*e;
     }
     return { M:M, th:th, a:th/2, stock:stock, endLen:endLen, lost:M*(1-Math.cos(th)) };
+  }
+  function setEndcutSteps(r){
+    $("owlSteps").innerHTML =
+      "<li>Cut a <b>" + frac(r.blank) + "</b> blank" + (r.lenMode === "end" ? " \u2014 that's what tilts in to cover " + frac(r.R) : "") + ".</li>" +
+      "<li>At one end, mark <b>" + frac(r.mark) + "</b> along the edge from the corner and strike the diagonal. Cut it \u2014 the wedge comes off the <b>bottom</b> corner.</li>" +
+      "<li>Other end: same <b>" + frac(r.mark) + "</b> mark, same lean \u2014 <b>the cuts are parallel</b> \u2014 but this wedge comes off the <b>top</b> corner. Opposite sides.</li>" +
+      "<li>Tilt the piece in " + r.angDeg.toFixed(1) + "\u00B0. The cut faces sit plumb \u2014 square to both connections \u2014 and the duct steps over <b>" + frac(r.O) + "</b>.</li>";
   }
   function setOwlSteps(r){
     var ol = $("owlSteps");
@@ -857,6 +906,33 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     }
     if(!r.owl){ $("tutBtn").hidden = true; $("tutBar").hidden = true; $("tutText").hidden = true; $("tutDia").hidden = true; $("skewCard").hidden = true; tutOn = false; }
     throatTipTxt();
+
+    if(r.owl && r.endcut){
+      owlLenTip();
+      $("cutTitle").textContent = "Your layout";
+      $("oCut").textContent = frac(r.mark);
+      $("oCutD").textContent = "cut mark \u00B7 " + r.mark.toFixed(3) + '"';
+      rows([
+        ["Tilt", r.angDeg.toFixed(1) + "\u00B0"],
+        ["Cut angle", r.angDeg.toFixed(1) + "\u00B0 off square, both ends"],
+        ["Wedges off", "opposite corners \u2014 cuts parallel"],
+        ["Blank to cut", frac(r.blank)],
+        ["Run covered", frac(r.R)],
+        ["Opening on the cut face", frac(r.open) + " (vs " + frac(r.Hc) + ")"]
+      ]);
+      $("skewCard").hidden = true;
+      tutR = r;
+      $("tutBtn").hidden = tutOn;
+      $("tutBar").hidden = !tutOn;
+      $("tutDia").hidden = !tutOn;
+      $("tutText").hidden = !tutOn;
+      $("owlSteps").hidden = tutOn;
+      if(tutOn) tutRender(); else setEndcutSteps(r);
+      $("oRoll").hidden = true;
+      $("oHint").innerHTML = "Both cut faces sit plumb once it's tilted in \u2014 <b>square to the connections, no extra straight needed</b>. That's the whole point.";
+      draw(r);
+      return;
+    }
 
     if(r.owl){
       owlLenTip(); endTipTxt();
@@ -948,7 +1024,87 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
   }
 
   /* ---------- diagrams ---------- */
+  function endcutDraw(r, S, svgEl){
+      var g = [];
+      function txt(px,py,t,anchor,big,color){
+        g.push('<text x="' + px + '" y="' + py + '" text-anchor="' + (anchor||"middle") +
+          '" font-family="monospace" font-size="' + (big?12.5:10.5) + '"' +
+          (big?' font-weight="bold"':'') + ' fill="' + (color||(big?"#B3541E":"#0F1A22")) + '">' + t + '</text>');
+      }
+      function dimline(x1,y1,x2,y2){
+        g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#0F1A22" stroke-width="1"/>');
+        var vx = (y2-y1), vy = -(x2-x1), L = Math.hypot(vx,vy)||1; vx/=L; vy/=L;
+        [[x1,y1],[x2,y2]].forEach(function(pp){
+          g.push('<line x1="' + (pp[0]-vx*4) + '" y1="' + (pp[1]-vy*4) + '" x2="' + (pp[0]+vx*4) + '" y2="' + (pp[1]+vy*4) + '" stroke="#0F1A22" stroke-width="1"/>');
+        });
+      }
+      var showAll = (S === 0);
+      function on(n){ return showAll || S >= n; }
+
+      var W = 300, cheekH = 44, lean = 22;
+      var x0 = 60, xEnd = x0 + W, yTop = 96;
+      var tY = yTop - cheekH/2, bY = yTop + cheekH/2;
+
+      // step 1: the blank
+      if(on(1)){
+        var lbl = (r.lenMode === "stock") ? "YOUR " + frac(r.blank) + " STICK" : "CUT A " + frac(r.blank) + " BLANK";
+        txt(x0, 46, lbl, "start", true, "#030D8C");
+        dimline(x0, 62, xEnd, 62);
+        txt((x0+xEnd)/2, 58, frac(r.blank), "middle");
+        g.push('<rect x="' + x0 + '" y="' + tY + '" width="' + W + '" height="' + cheekH + '" fill="#F0F2F4" stroke="#54646F" stroke-width="2"/>');
+      }
+      // step 2: first cut — wedge off the BOTTOM at the left end
+      if(on(2)){
+        g.push('<polygon points="' + x0 + ',' + bY + ' ' + (x0+lean) + ',' + bY + ' ' + x0 + ',' + tY + '" fill="#FFE0CC"/>');
+        g.push('<line x1="' + x0 + '" y1="' + tY + '" x2="' + (x0+lean) + '" y2="' + bY + '" stroke="#B3541E" stroke-width="2.8"/>');
+        dimline(x0, bY+12, x0+lean, bY+12);
+        txt((x0+lean/2), bY+25, "mark " + frac(r.mark), "middle", true);
+        txt(x0+lean+6, bY-6, "wedge off the bottom", "start", false, "#B3541E");
+      }
+      // step 3: second cut — parallel, wedge off the TOP at the right end
+      if(on(3)){
+        g.push('<polygon points="' + xEnd + ',' + tY + ' ' + (xEnd-lean) + ',' + tY + ' ' + xEnd + ',' + bY + '" fill="#FFE0CC"/>');
+        g.push('<line x1="' + (xEnd-lean) + '" y1="' + tY + '" x2="' + xEnd + '" y2="' + bY + '" stroke="#B3541E" stroke-width="2.8"/>');
+        dimline(xEnd-lean, tY-10, xEnd, tY-10);
+        txt(xEnd-lean/2, tY-14, "mark " + frac(r.mark), "middle", true);
+        txt(xEnd-lean-6, tY+12, "wedge off the top", "end", false, "#B3541E");
+        txt((x0+xEnd)/2, yTop+4, "CUTS PARALLEL \u2014 opposite corners", "middle", false, "#030D8C");
+      }
+      // step 4: tilted in, ends plumb
+      if(on(4)){
+        var yB = 208, th = Math.min(r.th, 22*Math.PI/180);   // exaggerate but cap for drawing
+        th = Math.max(th, 9*Math.PI/180);
+        var run = W*0.94, rise = run*Math.tan(th);
+        var bx0 = x0, bx1 = bx0 + run;
+        var cyLo = yB + rise/2 + cheekH/2, cyHi = cyLo - rise;
+        // parallelogram with plumb ends
+        var hw = cheekH/2 / Math.cos(th);
+        var p = [
+          [bx0, cyLo - hw], [bx1, cyHi - hw],
+          [bx1, cyHi + hw], [bx0, cyLo + hw]
+        ];
+        g.push('<polygon points="' + p.map(function(q){return q[0]+","+q[1];}).join(" ") + '" fill="#EAF0FF" stroke="#54646F" stroke-width="2"/>');
+        g.push('<line x1="' + bx0 + '" y1="' + cyLo + '" x2="' + bx1 + '" y2="' + cyHi + '" stroke="#030D8C" stroke-width="1.6" stroke-dasharray="7 4"/>');
+        // mating collars (plumb) at both ends
+        [[bx0,cyLo],[bx1,cyHi]].forEach(function(q){
+          g.push('<line x1="' + q[0] + '" y1="' + (q[1]-hw-8) + '" x2="' + q[0] + '" y2="' + (q[1]+hw+8) + '" stroke="#030D8C" stroke-width="2.5"/>');
+        });
+        txt(bx0, yB - rise/2 - cheekH/2 - 12, "TILT IT IN " + r.angDeg.toFixed(1) + "\u00B0 \u2014 ends sit plumb, square to the mates", "start", false, "#030D8C");
+        // offset dim
+        g.push('<line x1="' + (bx0-16) + '" y1="' + cyLo + '" x2="' + (bx0-16) + '" y2="' + cyHi + '" stroke="#0F1A22" stroke-width="1"/>');
+        txt(bx0-20, (cyLo+cyHi)/2+4, frac(r.O), "end", true, "#030D8C");
+        // run dim
+        var fD = cyLo + hw + 16;
+        dimline(bx0, fD, bx1, fD);
+        txt((bx0+bx1)/2, fD+13, frac(r.R) + " run covered", "middle");
+      }
+      var vbH = on(4) ? 290 : 160;
+      svgEl.setAttribute("viewBox", "0 30 " + (xEnd + 40) + " " + vbH);
+      svgEl.innerHTML = g.join("");
+  }
+
   function owlDraw(r, S, svgEl){
+      if(r.endcut){ endcutDraw(r, S, svgEl); return; }
       var g = [];
       function txt(px,py,t,anchor,big,color){
         g.push('<text x="' + px + '" y="' + py + '" text-anchor="' + (anchor||"middle") +
@@ -1201,6 +1357,12 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     $("flatBox").hidden  = f === "owl" || off.roll !== "flat";
     $("rollBox").hidden  = f === "owl" || off.roll !== "roll";
     $("owlBox").hidden   = f !== "owl";
+    if(f === "owl"){
+      $("connBox").hidden = off.method === "endcut";
+      $("methTip").innerHTML = off.method === "endcut"
+        ? "One piece. Trim both ends at the angle, tilt it in. Best for minor offsets."
+        : "Three pieces. Two mirror cuts, flip the middle. Keeps the whole duct axial \u2014 use it when the offset is steep.";
+    }
     syncFitLen();
     throatTouched = false;
     syncThroat();
@@ -1210,6 +1372,13 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     $("owlLenU").textContent = (off.lenMode === "end") ? "in finished" : "in stock";
   });
   oseg("segEnd","endConn");
+  oseg("segMeth","method", function(){
+    $("connBox").hidden = off.method === "endcut";
+    $("methTip").innerHTML = off.method === "endcut"
+      ? "One piece. Trim both ends at the angle, tilt it in. Best for minor offsets."
+      : "Three pieces. Two mirror cuts, flip the middle. Keeps the whole duct axial \u2014 use it when the offset is steep.";
+    tutStep = 1;
+  });
   oseg("segRoll","roll", function(){
     $("flatBox").hidden = off.roll !== "flat";
     $("rollBox").hidden = off.roll !== "roll";
@@ -1278,7 +1447,8 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
 
   $("tutBtn").addEventListener("click", function(){ tutOn = true; tutStep = 1; offPaint(); });
   $("tutNext").addEventListener("click", function(){
-    if(tutStep >= 6){ tutOn = false; offPaint(); return; }
+    var mx = tutR && tutR.endcut ? 4 : 6;
+    if(tutStep >= mx){ tutOn = false; offPaint(); return; }
     tutStep++; tutRender();
   });
   $("tutPrev").addEventListener("click", function(){ if(tutStep > 1){ tutStep--; tutRender(); } });
