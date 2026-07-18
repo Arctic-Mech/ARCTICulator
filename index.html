@@ -328,6 +328,20 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       <label class="lab" for="owlM">Middle piece</label>
       <div class="field"><input id="owlM" type="number" inputmode="decimal" size="1" value="30"><span class="unit">in between cuts</span></div>
       <p class="tip">The middle piece is what flips. Longer middle = shallower cuts = easier break.</p>
+      <label class="lab">Length</label>
+      <div class="seg" id="segLen" role="group" aria-label="Which length">
+        <button type="button" data-v="stock" aria-pressed="true">I have stock</button>
+        <button type="button" data-v="end" aria-pressed="false">I need finished</button>
+      </div>
+      <div class="field stack"><input id="owlLen" type="number" inputmode="decimal" size="1" value="96"><span class="unit" id="owlLenU">in stock</span></div>
+      <p class="tip" id="owlLenTip"></p>
+      <label class="lab">End connections</label>
+      <div class="seg" id="segEnd" role="group" aria-label="End connection">
+        <button type="button" data-v="raw" aria-pressed="true">S &amp; drive</button>
+        <button type="button" data-v="tdc" aria-pressed="false">TDC / Ductmate</button>
+      </div>
+      <div class="field stack" id="tdcBox" hidden><input id="owlFlange" type="number" inputmode="decimal" step="0.25" size="1" value="1"><span class="unit">in straight each end</span></div>
+      <p class="tip" id="tdcTip" hidden></p>
     </div>
     <p class="err" id="oErr" hidden></p>
   </section>
@@ -592,7 +606,7 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
   paint();
 
   /* ================= OFFSET ================= */
-  var off = { fit:"twoR", roll:"flat" };
+  var off = { fit:"twoR", roll:"flat", lenMode:"stock", endConn:"raw" };
   var ANGLES = [22.5, 30, 45, 60, 90];
   var WYE_LEN = {6:12,8:16,10:20,12:22,14:24,16:28,18:30,20:32,22:36,24:38,26:42,28:44};
   var fitLenTouched = false, throatTouched = false;
@@ -644,6 +658,21 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     $("oThroat").value = +(stdCL()*D - D/2).toFixed(3);
     throatTipTxt();
   }
+  function tdcTipTxt(){
+    if(off.endConn !== "tdc"){ $("tdcTip").hidden = true; return; }
+    $("tdcTip").hidden = false;
+    var f = num("owlFlange") || 1;
+    $("tdcTip").innerHTML = "You can't cut a miter through a flange. This keeps <b>" + frac(f) + "</b> of flat straight at each end so the TDC seats, and puts both angled cuts inboard.";
+  }
+  function owlLenTip(){
+    var Ln = num("owlLen"), Oo = num("owlO"), Mm = num("owlM");
+    if(Ln === null || Oo === null || Mm === null || Oo >= Mm){ $("owlLenTip").textContent = ""; return; }
+    var lost = Mm - Mm*Math.cos(Math.asin(Oo/Mm));
+    if((off.lenMode||"stock") === "stock")
+      $("owlLenTip").innerHTML = "Cut a " + frac(Ln) + " blank; finished it runs <b>" + frac(Ln-lost) + "</b> end to end.";
+    else
+      $("owlLenTip").innerHTML = "To finish at " + frac(Ln) + ", start with a <b>" + frac(Ln+lost) + "</b> blank.";
+  }
   function throatTipTxt(){
     var D = bendDim(), t = parseFloat($("oThroat").value);
     if(D === null || !isFinite(t)){ $("throatTip").textContent = ""; return; }
@@ -659,9 +688,21 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       if(Mm === null) return { err:"Enter the middle piece length." };
       if(Oo >= Mm) return { err:"Middle piece has to be longer than the offset \u2014 stretch it out." };
       var th2 = Math.asin(Oo/Mm), a = th2/2;
+      var lost = Mm - Mm*Math.cos(th2);
+      var lenMode = off.lenMode || "stock";
+      var Ln = num("owlLen");
+      var stock = null, endLen = null;
+      if(Ln !== null){
+        if(lenMode === "stock"){ stock = Ln; endLen = Ln - lost; }
+        else { endLen = Ln; stock = Ln + lost; }
+      }
+      var tdc = (off.endConn === "tdc");
+      var flange = tdc ? (num("owlFlange") || 1) : 0;
+      var minStock = Mm + 2*flange;
       return { owl:true, Hc:Hc, O:Oo, M:Mm, th:th2, a:a,
-               mark:Hc*Math.tan(a), runM:Mm*Math.cos(th2), lost:Mm - Mm*Math.cos(th2),
-               angDeg:th2*180/Math.PI };
+               mark:Hc*Math.tan(a), runM:Mm*Math.cos(th2), lost:lost,
+               angDeg:th2*180/Math.PI, lenMode:lenMode, stock:stock, endLen:endLen,
+               tdc:tdc, flange:flange, minStock:minStock };
     }
 
     var angDeg = num("oAng");
@@ -711,6 +752,24 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     return base;
   }
 
+  function setOwlSteps(r){
+    var ol = $("owlSteps");
+    if(r.tdc){
+      ol.innerHTML =
+        "<li>Roll the TDC frames on both ends first \u2014 they need to sit on flat, straight duct, so <b>keep " + frac(r.flange) + " of straight square at each end</b>.</li>" +
+        "<li>Inboard of the frames, mark the two square lines that bound the <b>" + frac(r.M) + " middle piece</b>.</li>" +
+        "<li>From each line strike the <b>" + frac(r.mark) + " diagonal</b> across the cheek. <b>Both lean the same way.</b> The cuts stay clear of the flanges.</li>" +
+        "<li>Cut both diagonals, all four sides. Now you have two flanged end collars and a middle.</li>" +
+        "<li>Flip the middle end for end \u2014 like closing a book, don't rotate it \u2014 and reband it to the collars. Frames stay flat, duct steps over by " + frac(r.O) + ".</li>";
+    } else {
+      ol.innerHTML =
+        "<li>Square a line around the duct at each end of the middle piece.</li>" +
+        "<li>From each line, measure the <b>" + frac(r.mark) + " layout mark</b> across the cheek \u2014 top corner to bottom corner \u2014 and strike the diagonal. <b>Both diagonals lean the same way.</b></li>" +
+        "<li>Cut both lines, all four sides.</li>" +
+        "<li>Flip the middle piece end for end. Don't rotate it \u2014 flip it like closing a book.</li>" +
+        "<li>Fit it back in. The duct now steps over by " + frac(r.O) + ".</li>";
+    }
+  }
   function rows(list){
     $("oRows").innerHTML = list.map(function(r){
       return '<div class="cr"><span class="ck">' + r[0] + '</span><span>' + r[1] + '</span></div>';
@@ -731,16 +790,26 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     throatTipTxt();
 
     if(r.owl){
+      owlLenTip(); tdcTipTxt();
       $("cutTitle").textContent = "Your layout";
       $("oCut").textContent = frac(r.mark);
       $("oCutD").textContent = "layout mark \u00B7 " + r.mark.toFixed(3) + '"';
-      rows([
+      var owlRows = [
         ["Cut angle", (r.a*180/Math.PI).toFixed(1) + "\u00B0 off square"],
         ["Duct turns", r.angDeg.toFixed(1) + "\u00B0 and back"],
-        ["Middle covers", frac(r.runM) + " of run"],
         ["Length lost", frac(r.lost)]
-      ]);
+      ];
+      if(r.tdc){
+        owlRows.push(["Straight each end", frac(r.flange) + " for the frame"]);
+        owlRows.push(["Middle + collars", frac(r.minStock) + " min"]);
+      }
+      if(r.stock !== null){
+        owlRows.push(["Cut from stock", frac(r.stock)]);
+        owlRows.push(["Finished run", frac(r.endLen)]);
+      }
+      rows(owlRows);
       $("owlSteps").hidden = false;
+      setOwlSteps(r);
       $("oRoll").hidden = true;
       $("oHint").innerHTML = "The mark is how far the diagonal walks across the cheek \u2014 square line at the top corner, " + frac(r.mark) + " over at the bottom.";
       draw(r);
@@ -824,12 +893,21 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
 
     if(r.owl){
       var Hc = r.Hc, M = r.M, lead = Math.max(M*0.3, Hc*1.1);
-      var total = M + 2*lead + r.mark;
+      var total = M + 2*lead + r.mark + (r.tdc?2*r.flange:0);
       sc = (W - 2*pad)/total;
       ox = pad; var yTop = 66;
-      var mk = r.mark, c1 = lead, c2 = lead + M;
+      var mk = r.mark, c1 = lead + (r.tdc?r.flange:0), c2 = c1 + M;
       // 1. layout view
       duct("M" + X(0) + "," + yTop + "L" + X(total) + "," + yTop, Hc);
+      if(r.tdc){
+        var fpx = r.flange*sc;
+        [[X(0), 1],[X(total), -1]].forEach(function(ff){
+          var fx = ff[0], dir = ff[1];
+          g.push('<rect x="' + (dir>0?fx:fx-6) + '" y="' + (yTop-Hc/2*sc-5) + '" width="6" height="' + (Hc*sc+10) + '" fill="#030D8C"/>');
+          g.push('<rect x="' + (dir>0?fx:fx-fpx) + '" y="' + (yTop-Hc/2*sc) + '" width="' + fpx + '" height="' + (Hc*sc) + '" fill="#030D8C" opacity="0.12"/>');
+        });
+        txt(X(r.flange/2), yTop-Hc/2*sc-10, "keep " + frac(r.flange), "middle", false, "#030D8C");
+      }
       [[c1],[c2]].forEach(function(cc){
         var c = cc[0];
         g.push('<line x1="' + X(c) + '" y1="' + (yTop-Hc/2*sc) + '" x2="' + X(c) + '" y2="' + (yTop+Hc/2*sc) + '" stroke="#54646F" stroke-width="1" stroke-dasharray="3 3"/>');
@@ -974,6 +1052,12 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     syncThroat();
   }
   oseg("fitPick","fit", syncFit);
+  oseg("segLen","lenMode", function(){
+    $("owlLenU").textContent = (off.lenMode === "end") ? "in finished" : "in stock";
+  });
+  oseg("segEnd","endConn", function(){
+    $("tdcBox").hidden = off.endConn !== "tdc";
+  });
   oseg("segRoll","roll", function(){
     $("flatBox").hidden = off.roll !== "flat";
     $("rollBox").hidden = off.roll !== "roll";
@@ -1009,7 +1093,7 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     rc.appendChild(b);
   });
 
-  ["oD","oBend","oOther","oTap","oTapLen","oStub","oAng","oOff","oH","oV","owlO","owlM"].forEach(function(id){
+  ["oD","oBend","oOther","oTap","oTapLen","oStub","oAng","oOff","oH","oV","owlO","owlM","owlLen","owlFlange"].forEach(function(id){
     $(id).addEventListener("input", function(){
       if(id === "oAng") syncAng();
       if(id === "oTap"){ syncFitLen(); syncThroat(); }
