@@ -893,46 +893,74 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     }
 
     if(r.owl){
-      var Hc = r.Hc, M = r.M, e = r.endAllow, mk = r.mark;
-      var total = 2*e + M + mk;
-      sc = (W - 2*pad)/total;
-      ox = pad; var yTop = 76;
-      var c1 = e, c2 = e + M;
-      duct("M" + X(0) + "," + yTop + "L" + X(total) + "," + yTop, Hc);
-      // reserved straight + connection markers at the very ends
-      [[0,1],[total,-1]].forEach(function(ff){
+      // schematic — fixed proportions, real numbers labeled. Never to scale.
+      var midW = 210, endW = 46, cheekH = 38, lean = 15, riseTop = 26;
+      var Lx = 46;
+      var x0 = Lx, xC1 = x0 + endW, xC2 = xC1 + midW, xEnd = xC2 + endW;
+
+      // ===== TOP: lay-out on the stock =====
+      var tHdr = 44;                 // "CUT A ... STICK"
+      var tDim = 60;                 // full-stock dimension line
+      var yTop = 96;                 // duct centerline
+      var stockLbl = (r.lenMode === "stock") ? "CUT A " + frac(r.stock) + " STICK" : "START WITH A " + frac(r.stock) + " STICK";
+      txt(x0, tHdr, stockLbl, "start", true, "#030D8C");
+      txt(x0, tHdr+15, "lay it out \u2014 both diagonals lean the same way", "start", false, "#54646F");
+      dimline(x0, tDim, xEnd, tDim);
+      txt((x0+xEnd)/2, tDim-4, frac(r.stock) + (r.lenMode==="stock" ? " on hand" : " to cut"), "middle", false, "#0F1A22");
+
+      // duct body
+      g.push('<rect x="' + x0 + '" y="' + (yTop-cheekH/2) + '" width="' + (xEnd-x0) + '" height="' + cheekH + '" fill="#F0F2F4" stroke="#9AA7B1" stroke-width="2"/>');
+      // reserved straight + connection markers
+      [[x0,1],[xEnd,-1]].forEach(function(ff){
         var xx = ff[0], dir = ff[1];
-        g.push('<rect x="' + (dir>0?X(xx):X(xx)-e*sc) + '" y="' + (yTop-Hc/2*sc) + '" width="' + (e*sc) + '" height="' + (Hc*sc) + '" fill="#030D8C" opacity="0.10"/>');
-        if(r.tdc){
-          g.push('<rect x="' + (dir>0?X(xx):X(xx)-6) + '" y="' + (yTop-Hc/2*sc-5) + '" width="6" height="' + (Hc*sc+10) + '" fill="#030D8C"/>');
-        } else {
-          for(var k=-1;k<=1;k++){
-            g.push('<line x1="' + X(xx) + '" y1="' + (yTop+k*Hc/4*sc) + '" x2="' + (X(xx)+dir*5) + '" y2="' + (yTop+k*Hc/4*sc) + '" stroke="#030D8C" stroke-width="1.6"/>');
-          }
-        }
+        g.push('<rect x="' + (dir>0?xx:xx-endW) + '" y="' + (yTop-cheekH/2) + '" width="' + endW + '" height="' + cheekH + '" fill="#030D8C" opacity="0.09"/>');
+        if(r.tdc) g.push('<rect x="' + (xx-3) + '" y="' + (yTop-cheekH/2-5) + '" width="6" height="' + (cheekH+10) + '" fill="#030D8C"/>');
+        else for(var k=-1;k<=1;k++) g.push('<line x1="' + xx + '" y1="' + (yTop+k*cheekH/4) + '" x2="' + (xx+dir*6) + '" y2="' + (yTop+k*cheekH/4) + '" stroke="#030D8C" stroke-width="1.8"/>');
       });
-      [c1,c2].forEach(function(c){
-        g.push('<line x1="' + X(c) + '" y1="' + (yTop-Hc/2*sc) + '" x2="' + X(c) + '" y2="' + (yTop+Hc/2*sc) + '" stroke="#54646F" stroke-width="1" stroke-dasharray="3 3"/>');
-        g.push('<line x1="' + X(c) + '" y1="' + (yTop-Hc/2*sc) + '" x2="' + X(c+mk) + '" y2="' + (yTop+Hc/2*sc) + '" stroke="#B3541E" stroke-width="2.2"/>');
+      // cut diagonals (exaggerated, same lean)
+      [xC1, xC2].forEach(function(cx){
+        g.push('<line x1="' + cx + '" y1="' + (yTop-cheekH/2) + '" x2="' + cx + '" y2="' + (yTop+cheekH/2) + '" stroke="#54646F" stroke-width="1" stroke-dasharray="3 3"/>');
+        g.push('<line x1="' + cx + '" y1="' + (yTop-cheekH/2) + '" x2="' + (cx+lean) + '" y2="' + (yTop+cheekH/2) + '" stroke="#B3541E" stroke-width="2.4"/>');
       });
-      txt(X(0), yTop-Hc/2*sc-30, "LAY OUT \u2014 both diagonals lean the same way", "start", false, "#030D8C");
-      dimline(X(c1), yTop-Hc/2*sc-11, X(c2), yTop-Hc/2*sc-11);
-      txt((X(c1)+X(c2))/2, yTop-Hc/2*sc-15, "flips " + frac(M));
-      if(e*sc > 16) txt(X(e/2), yTop+Hc/2*sc+15, "keep " + frac(e), "middle", false, "#030D8C");
-      dimline(X(c1), yTop+Hc/2*sc+9, X(c1+mk), yTop+Hc/2*sc+9);
-      txt((X(c1)+X(c1+mk))/2, yTop+Hc/2*sc+22, "mark " + frac(mk), "middle", true);
-      // after the flip
-      var yB = 208;
-      var p1 = e, p2 = e + r.runM, afterTot = 2*e + r.runM;
-      var path2 = "M" + X(0) + "," + (yB + r.O*sc) + "L" + X(p1) + "," + (yB + r.O*sc) +
-                  "L" + X(p2) + "," + yB + "L" + X(afterTot) + "," + yB;
-      duct(path2, Hc); cl(path2);
-      dimline(X(0)-11, yB, X(0)-11, yB + r.O*sc);
-      txt(X(0)-15, yB + r.O*sc/2 + 4, frac(r.O), "end", true, "#030D8C");
-      txt(X(0), yB - Hc/2*sc - 12, "AFTER THE FLIP \u2014 runs " + frac(r.endLen), "start", false, "#030D8C");
-      txt(X(p1)+8, yB + r.O*sc - 5, r.angDeg.toFixed(1) + "\u00B0", "start");
+      txt((xC1+xC2)/2, yTop+3, "FLIP END FOR END", "middle", false, "#030D8C");
+      // middle dim (below the duct)
+      var mDim = yTop + cheekH/2 + 16;
+      dimline(xC1, mDim, xC2, mDim);
+      txt((xC1+xC2)/2, mDim+13, "middle " + frac(r.M) + " \u2014 flips");
+      // "keep" sits on the shaded end band; mark on its own row
+      txt((x0+xC1)/2, yTop+3, "keep", "middle", false, "#030D8C");
+      txt((x0+xC1)/2, yTop+15, frac(r.endAllow), "middle", false, "#030D8C");
+      var kDim = mDim + 26;
+      dimline(xC1, kDim, xC1+lean, kDim);
+      txt(xC1+lean+5, kDim+4, "cut mark " + frac(r.mark), "start", true);
+
+      // ===== BOTTOM: after the flip =====
+      var bHdr = kDim + 40;
+      var bx0 = Lx, bx1 = bx0 + endW, bx2 = bx1 + midW, bx3 = bx2 + endW;
+      var cyLo = bHdr + 34 + riseTop, cyHi = cyLo - riseTop;
+      var finLbl = (r.lenMode === "end") ? "FINISHES AT " + frac(r.endLen) + " \u2014 what you asked" : "FINISHES AT " + frac(r.endLen);
+      txt(bx0, bHdr, finLbl, "start", true, "#030D8C");
+      txt(bx0, bHdr+15, "after the flip", "start", false, "#54646F");
+      function seg(x1,y1,x2,y2){
+        g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#9AA7B1" stroke-width="' + cheekH + '" stroke-linecap="butt"/>');
+        g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#F0F2F4" stroke-width="' + (cheekH-4) + '" stroke-linecap="butt"/>');
+      }
+      seg(bx0, cyLo, bx1, cyLo);
+      seg(bx1, cyLo, bx2, cyHi);
+      seg(bx2, cyHi, bx3, cyHi);
+      g.push('<path d="M' + bx0 + ',' + cyLo + 'L' + bx1 + ',' + cyLo + 'L' + bx2 + ',' + cyHi + 'L' + bx3 + ',' + cyHi + '" fill="none" stroke="#030D8C" stroke-width="1.6" stroke-dasharray="7 4"/>');
+      // offset dim (left)
+      g.push('<line x1="' + (bx0-16) + '" y1="' + cyLo + '" x2="' + (bx0-16) + '" y2="' + cyHi + '" stroke="#0F1A22" stroke-width="1"/>');
+      [[cyLo],[cyHi]].forEach(function(yy){ g.push('<line x1="' + (bx0-19) + '" y1="' + yy[0] + '" x2="' + (bx0-13) + '" y2="' + yy[0] + '" stroke="#0F1A22" stroke-width="1"/>'); });
+      txt(bx0-22, (cyLo+cyHi)/2+4, frac(r.O), "end", true, "#030D8C");
+      txt((bx1+bx2)/2, cyLo+cheekH/2+2, r.angDeg.toFixed(1) + "\u00B0", "middle");
+      // finished length dim (bottom)
+      var fDim = cyLo + cheekH/2 + 16;
+      dimline(bx0, fDim, bx3, fDim);
+      txt((bx0+bx3)/2, fDim+13, frac(r.endLen) + " end to end", "middle", false, "#0F1A22");
+
       var svg0 = $("svg");
-      svg0.setAttribute("viewBox", "-14 -6 " + (W+28) + " " + (Ht+40));
+      svg0.setAttribute("viewBox", "0 30 " + (xEnd + 30) + " " + (fDim + 26 - 30));
       svg0.innerHTML = g.join("");
       return;
     }
