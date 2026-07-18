@@ -760,21 +760,15 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
   }
   function setOwlSteps(r){
     var ol = $("owlSteps");
-    if(r.tdc){
-      ol.innerHTML =
-        "<li>Roll the TDC frames on both ends first \u2014 they need to sit on flat, straight duct, so <b>keep " + frac(r.endAllow) + " of straight square at each end</b>.</li>" +
-        "<li>Inboard of the frames, mark the two square lines that bound the <b>" + frac(r.M) + " middle piece</b>.</li>" +
-        "<li>From each line strike the <b>" + frac(r.mark) + " diagonal</b> across the cheek. <b>Both lean the same way.</b> The cuts stay clear of the flanges.</li>" +
-        "<li>Cut both diagonals, all four sides. Now you have two flanged end collars and a middle.</li>" +
-        "<li>Flip the middle end for end \u2014 like closing a book, don't rotate it \u2014 and reband it to the collars. Frames stay flat, duct steps over by " + frac(r.O) + ".</li>";
-    } else {
-      ol.innerHTML =
-        "<li>Square a line around the duct at each end of the middle piece.</li>" +
-        "<li>From each line, measure the <b>" + frac(r.mark) + " layout mark</b> across the cheek \u2014 top corner to bottom corner \u2014 and strike the diagonal. <b>Both diagonals lean the same way.</b></li>" +
-        "<li>Cut both lines, all four sides.</li>" +
-        "<li>Flip the middle piece end for end. Don't rotate it \u2014 flip it like closing a book.</li>" +
-        "<li>Fit it back in. The duct now steps over by " + frac(r.O) + ".</li>";
-    }
+    var pre = r.tdc
+      ? "<li>Roll the TDC frames on both ends first \u2014 they sit on flat straight duct, so keep <b>" + frac(r.endAllow) + "</b> of straight square at each end and put the cuts inboard of them.</li>"
+      : "<li>Measure in <b>" + frac(r.endAllow) + "</b> from each end for the S&drive, and square a line around the duct there. Everything between is in play.</li>";
+    ol.innerHTML = pre +
+      "<li>That leaves a <b>" + frac(r.M) + " middle piece</b> \u2014 the part that flips \u2014 with a short <b>keep</b> collar at each end.</li>" +
+      "<li><b>First cut:</b> from the top corner, strike the <b>" + frac(r.mark) + " diagonal</b> down across the cheek. Cut all four sides.</li>" +
+      "<li><b>Second cut: mirror it.</b> Same " + frac(r.mark) + " mark, but leaning the opposite way \u2014 from the bottom corner up. The two cuts are opposite hands, not parallel.</li>" +
+      "<li>Flip the middle piece end for end \u2014 like closing a book \u2014 so the two bevels meet the collars. That forms both bends and steps the duct over <b>" + frac(r.O) + "</b>.</li>" +
+      "<li>Band or seam the three pieces back together. Nothing is thrown away.</li>";
   }
   function rows(list){
     $("oRows").innerHTML = list.map(function(r){
@@ -894,48 +888,62 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
 
     if(r.owl){
       // schematic — fixed proportions, real numbers labeled. Never to scale.
-      var midW = 210, endW = 46, cheekH = 38, lean = 15, riseTop = 26;
+      var midW = 196, endW = 52, cheekH = 40, lean = 17, riseTop = 26;
       var Lx = 46;
       var x0 = Lx, xC1 = x0 + endW, xC2 = xC1 + midW, xEnd = xC2 + endW;
+      var yTop = 100;
+      var half = cheekH/2, tY = yTop-half, bY = yTop+half;
 
-      // ===== TOP: lay-out on the stock =====
-      var tHdr = 44;                 // "CUT A ... STICK"
-      var tDim = 60;                 // full-stock dimension line
-      var yTop = 96;                 // duct centerline
+      // ---- header + full-stock dimension ----
       var stockLbl = (r.lenMode === "stock") ? "CUT A " + frac(r.stock) + " STICK" : "START WITH A " + frac(r.stock) + " STICK";
-      txt(x0, tHdr, stockLbl, "start", true, "#030D8C");
-      txt(x0, tHdr+15, "lay it out \u2014 both diagonals lean the same way", "start", false, "#54646F");
-      dimline(x0, tDim, xEnd, tDim);
-      txt((x0+xEnd)/2, tDim-4, frac(r.stock) + (r.lenMode==="stock" ? " on hand" : " to cut"), "middle", false, "#0F1A22");
+      txt(x0, 44, stockLbl, "start", true, "#030D8C");
+      txt(x0, 59, "two cuts, mirror image \u2014 flip the middle", "start", false, "#54646F");
+      dimline(x0, 74, xEnd, 74);
+      txt((x0+xEnd)/2, 70, frac(r.stock) + (r.lenMode==="stock" ? " on hand" : " to cut"), "middle", false, "#0F1A22");
 
-      // duct body
-      g.push('<rect x="' + x0 + '" y="' + (yTop-cheekH/2) + '" width="' + (xEnd-x0) + '" height="' + cheekH + '" fill="#F0F2F4" stroke="#9AA7B1" stroke-width="2"/>');
-      // reserved straight + connection markers
+      // ---- three sections, each a filled polygon split by the mirrored cuts ----
+      // cut1 leans "\" : top at xC1, bottom at xC1+lean.  cut2 leans "/" : top at xC2, bottom at xC2-lean.
+      var a_t = xC1, a_b = xC1 + lean, b_t = xC2, b_b = xC2 - lean;
+      function poly(pts, fill){
+        g.push('<polygon points="' + pts.map(function(q){return q[0]+","+q[1];}).join(" ") + '" fill="' + fill + '" stroke="#9AA7B1" stroke-width="1.5"/>');
+      }
+      poly([[x0,tY],[a_t,tY],[a_b,bY],[x0,bY]], "#EAF0FF");                 // END A (keep)
+      poly([[a_t,tY],[b_t,tY],[b_b,bY],[a_b,bY]], "#FFE9DC");              // MIDDLE (flip)
+      poly([[b_t,tY],[xEnd,tY],[xEnd,bY],[b_b,bY]], "#EAF0FF");           // END B (keep)
+      // outer duct outline
+      g.push('<rect x="' + x0 + '" y="' + tY + '" width="' + (xEnd-x0) + '" height="' + cheekH + '" fill="none" stroke="#54646F" stroke-width="2"/>');
+      // the two mirrored cut lines
+      g.push('<line x1="' + a_t + '" y1="' + tY + '" x2="' + a_b + '" y2="' + bY + '" stroke="#B3541E" stroke-width="2.6"/>');
+      g.push('<line x1="' + b_t + '" y1="' + tY + '" x2="' + b_b + '" y2="' + bY + '" stroke="#B3541E" stroke-width="2.6"/>');
+      // connection markers at the very ends
       [[x0,1],[xEnd,-1]].forEach(function(ff){
         var xx = ff[0], dir = ff[1];
-        g.push('<rect x="' + (dir>0?xx:xx-endW) + '" y="' + (yTop-cheekH/2) + '" width="' + endW + '" height="' + cheekH + '" fill="#030D8C" opacity="0.09"/>');
-        if(r.tdc) g.push('<rect x="' + (xx-3) + '" y="' + (yTop-cheekH/2-5) + '" width="6" height="' + (cheekH+10) + '" fill="#030D8C"/>');
+        if(r.tdc) g.push('<rect x="' + (xx-3) + '" y="' + (tY-5) + '" width="6" height="' + (cheekH+10) + '" fill="#030D8C"/>');
         else for(var k=-1;k<=1;k++) g.push('<line x1="' + xx + '" y1="' + (yTop+k*cheekH/4) + '" x2="' + (xx+dir*6) + '" y2="' + (yTop+k*cheekH/4) + '" stroke="#030D8C" stroke-width="1.8"/>');
       });
-      // cut diagonals (exaggerated, same lean)
-      [xC1, xC2].forEach(function(cx){
-        g.push('<line x1="' + cx + '" y1="' + (yTop-cheekH/2) + '" x2="' + cx + '" y2="' + (yTop+cheekH/2) + '" stroke="#54646F" stroke-width="1" stroke-dasharray="3 3"/>');
-        g.push('<line x1="' + cx + '" y1="' + (yTop-cheekH/2) + '" x2="' + (cx+lean) + '" y2="' + (yTop+cheekH/2) + '" stroke="#B3541E" stroke-width="2.4"/>');
-      });
-      txt((xC1+xC2)/2, yTop+3, "FLIP END FOR END", "middle", false, "#030D8C");
-      // middle dim (below the duct)
-      var mDim = yTop + cheekH/2 + 16;
-      dimline(xC1, mDim, xC2, mDim);
-      txt((xC1+xC2)/2, mDim+13, "middle " + frac(r.M) + " \u2014 flips");
-      // "keep" sits on the shaded end band; mark on its own row
-      txt((x0+xC1)/2, yTop+3, "keep", "middle", false, "#030D8C");
-      txt((x0+xC1)/2, yTop+15, frac(r.endAllow), "middle", false, "#030D8C");
+      // section labels inside each zone
+      txt((x0+a_t)/2, yTop-3, "END", "middle", false, "#3A4A8C");
+      txt((x0+a_t)/2, yTop+11, "keep", "middle", false, "#3A4A8C");
+      txt((a_t+b_t)/2, yTop-3, "MIDDLE", "middle", true, "#B3541E");
+      txt((a_t+b_t)/2, yTop+12, "flip it", "middle", false, "#B3541E");
+      txt((b_t+xEnd)/2, yTop-3, "END", "middle", false, "#3A4A8C");
+      txt((b_t+xEnd)/2, yTop+11, "keep", "middle", false, "#3A4A8C");
+      // middle length dim below
+      var mDim = bY + 16;
+      dimline(a_t, mDim, b_t, mDim);
+      txt((a_t+b_t)/2, mDim+13, "middle " + frac(r.M));
+      // keep-each-end dim
+      dimline(x0, mDim, a_t, mDim);
+      txt((x0+a_t)/2, mDim+13, "keep " + frac(r.endAllow), "middle", false, "#030D8C");
+      dimline(b_t, mDim, xEnd, mDim);
+      txt((b_t+xEnd)/2, mDim+13, "keep " + frac(r.endAllow), "middle", false, "#030D8C");
+      // mark dim (the diagonal walk on cut 1)
       var kDim = mDim + 26;
-      dimline(xC1, kDim, xC1+lean, kDim);
-      txt(xC1+lean+5, kDim+4, "cut mark " + frac(r.mark), "start", true);
+      dimline(a_t, kDim, a_b, kDim);
+      txt(a_b+5, kDim+4, "cut mark " + frac(r.mark) + " (each cut, opposite hands)", "start", true);
 
-      // ===== BOTTOM: after the flip =====
-      var bHdr = kDim + 40;
+      // ---- after the flip ----
+      var bHdr = kDim + 42;
       var bx0 = Lx, bx1 = bx0 + endW, bx2 = bx1 + midW, bx3 = bx2 + endW;
       var cyLo = bHdr + 34 + riseTop, cyHi = cyLo - riseTop;
       var finLbl = (r.lenMode === "end") ? "FINISHES AT " + frac(r.endLen) + " \u2014 what you asked" : "FINISHES AT " + frac(r.endLen);
@@ -943,24 +951,22 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       txt(bx0, bHdr+15, "after the flip", "start", false, "#54646F");
       function seg(x1,y1,x2,y2){
         g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#9AA7B1" stroke-width="' + cheekH + '" stroke-linecap="butt"/>');
-        g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#F0F2F4" stroke-width="' + (cheekH-4) + '" stroke-linecap="butt"/>');
+        g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#EAF0FF" stroke-width="' + (cheekH-4) + '" stroke-linecap="butt"/>');
       }
       seg(bx0, cyLo, bx1, cyLo);
       seg(bx1, cyLo, bx2, cyHi);
       seg(bx2, cyHi, bx3, cyHi);
       g.push('<path d="M' + bx0 + ',' + cyLo + 'L' + bx1 + ',' + cyLo + 'L' + bx2 + ',' + cyHi + 'L' + bx3 + ',' + cyHi + '" fill="none" stroke="#030D8C" stroke-width="1.6" stroke-dasharray="7 4"/>');
-      // offset dim (left)
       g.push('<line x1="' + (bx0-16) + '" y1="' + cyLo + '" x2="' + (bx0-16) + '" y2="' + cyHi + '" stroke="#0F1A22" stroke-width="1"/>');
       [[cyLo],[cyHi]].forEach(function(yy){ g.push('<line x1="' + (bx0-19) + '" y1="' + yy[0] + '" x2="' + (bx0-13) + '" y2="' + yy[0] + '" stroke="#0F1A22" stroke-width="1"/>'); });
       txt(bx0-22, (cyLo+cyHi)/2+4, frac(r.O), "end", true, "#030D8C");
       txt((bx1+bx2)/2, cyLo+cheekH/2+2, r.angDeg.toFixed(1) + "\u00B0", "middle");
-      // finished length dim (bottom)
       var fDim = cyLo + cheekH/2 + 16;
       dimline(bx0, fDim, bx3, fDim);
       txt((bx0+bx3)/2, fDim+13, frac(r.endLen) + " end to end", "middle", false, "#0F1A22");
 
       var svg0 = $("svg");
-      svg0.setAttribute("viewBox", "0 30 " + (xEnd + 30) + " " + (fDim + 26 - 30));
+      svg0.setAttribute("viewBox", "0 30 " + (xEnd + 40) + " " + (fDim + 26 - 30));
       svg0.innerHTML = g.join("");
       return;
     }
