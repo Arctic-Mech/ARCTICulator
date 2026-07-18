@@ -85,6 +85,16 @@ body{
 .cutbig .cutd{font-size:15px;color:var(--ink-soft);font-weight:400;margin-left:10px}
 .cutrows{margin-top:12px;border-top:1px solid var(--rule)}
 .cutrows .cr{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #E2E7EA;font-family:var(--mono);font-size:15px}
+.tut{width:100%;min-height:56px;border:2px solid var(--brand);background:var(--brand);color:#fff;border-radius:3px;cursor:pointer;
+  font-family:var(--cond);font-size:19px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-top:6px}
+.tut:active{background:#02096b}
+.tutbar{display:flex;align-items:center;gap:8px;margin-top:6px}
+.tutbar button{flex:0 0 auto;min-height:52px;padding:0 18px;border:2px solid var(--plate);background:#fff;color:var(--plate);border-radius:3px;cursor:pointer;
+  font-family:var(--cond);font-size:16px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.tutbar button:disabled{opacity:.35}
+.tutstep{flex:1;text-align:center;font-family:var(--cond);font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+.tuttext{background:#EAF0FF;border:2px solid var(--rule);border-left:5px solid var(--brand);border-radius:3px;padding:13px 14px;margin-top:10px;font-size:16px;line-height:1.5;color:var(--ink)}
+.tuttext b{color:var(--brand)}
 .steps{margin:14px 0 0;padding-left:22px;font-size:15px;line-height:1.6;color:var(--ink-soft)}
 .steps li{margin-bottom:8px}
 .steps b{color:var(--ink)}
@@ -349,6 +359,13 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     <div class="cutbig"><span id="oCut">&mdash;</span><span class="cutd" id="oCutD"></span></div>
     <div class="cutrows" id="oRows"></div>
     <div class="roll" id="oRoll" hidden></div>
+    <button type="button" class="tut" id="tutBtn" hidden>&#9654;&ensp;Walk me through the cuts</button>
+    <div class="tutbar" id="tutBar" hidden>
+      <button type="button" id="tutPrev">&#8249; Back</button>
+      <div class="tutstep" id="tutStep">Step 1 of 6</div>
+      <button type="button" id="tutNext">Next &#8250;</button>
+    </div>
+    <p class="tuttext" id="tutText" hidden></p>
     <ol class="steps" id="owlSteps" hidden>
       <li>Square a line around the duct at each end of the middle piece.</li>
       <li>From each line, measure the <b>layout mark</b> across the cheek &mdash; top corner to bottom corner &mdash; and strike the diagonal. <b>Both diagonals lean the same way.</b></li>
@@ -605,6 +622,30 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
 
   /* ================= OFFSET ================= */
   var off = { fit:"twoR", roll:"flat", lenMode:"stock", endConn:"raw" };
+  var tutOn = false, tutStep = 1, tutR = null;
+  function tutTextFor(n, r){
+    var m = frac(r.mark), M = frac(r.M), O = frac(r.O), e = frac(r.endAllow), stk = frac(r.stock);
+    var conn = r.tdc ? "TDC frame" : "S&drive";
+    switch(n){
+      case 1: return "Start with your <b>" + stk + "</b> stick" + (r.lenMode==="end" ? " (that's what to cut so it finishes at " + frac(r.endLen) + ")" : "") + ". Lay it flat, one cheek up.";
+      case 2: return r.needExtra
+        ? "Measure in <b>" + e + "</b> from each end and square a line — that flat holds your <b>" + conn + "</b>. Everything between the two lines is in play."
+        : "Your cut already leaves <b>" + frac(r.freeStraight) + "</b> of straight at the corner, enough for the <b>" + conn + "</b> — so you can skip the collar. Square a line at each end.";
+      case 3: return "<b>First cut.</b> From the top corner strike a diagonal down across the cheek, <b>" + m + "</b> over. Cut all four sides.";
+      case 4: return "<b>Second cut — mirror it.</b> Same <b>" + m + "</b> mark but leaning the other way, up from the bottom corner. Opposite hands, not parallel.";
+      case 5: return "Now you have three pieces: two <b>KEEP</b> ends and the <b>" + M + " MIDDLE</b> that flips.";
+      case 6: return "Flip the middle end for end and band it back. The duct steps over <b>" + O + "</b> and finishes at <b>" + frac(r.endLen) + "</b>.";
+    }
+    return "";
+  }
+  function tutRender(){
+    if(!tutR) return;
+    $("tutStep").textContent = "Step " + tutStep + " of 6";
+    $("tutText").innerHTML = tutTextFor(tutStep, tutR);
+    $("tutPrev").disabled = tutStep <= 1;
+    $("tutNext").textContent = tutStep >= 6 ? "Done" : "Next ›";
+    draw(tutR);
+  }
   var ANGLES = [22.5, 30, 45, 60, 90];
   var WYE_LEN = {6:12,8:16,10:20,12:22,14:24,16:28,18:30,20:32,22:36,24:38,26:42,28:44};
   var fitLenTouched = false, throatTouched = false;
@@ -692,10 +733,15 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       if(!s) return { err: lenMode === "stock"
         ? "Stock is too short for that offset \u2014 use a longer piece."
         : "Finished length is too short for the end connections." };
+      // the miter overhang: at zero collar, how much straight the corner-to-corner cut leaves
+      var s0 = owlSolve(lenMode, Ln, Oo, 0);
+      var freeStraight = s0 ? Hc*Math.tan(s0.a) : Hc*Math.tan(s.a);
+      var needExtra = e > freeStraight + 1e-6;
       return { owl:true, Hc:Hc, O:Oo, M:s.M, th:s.th, a:s.a,
                mark:Hc*Math.tan(s.a), runM:s.M*Math.cos(s.th), lost:s.lost,
                angDeg:s.th*180/Math.PI, lenMode:lenMode, stock:s.stock, endLen:s.endLen,
-               tdc:(off.endConn === "tdc"), endAllow:e };
+               tdc:(off.endConn === "tdc"), endAllow:e,
+               freeStraight:freeStraight, needExtra:needExtra };
     }
 
     var angDeg = num("oAng");
@@ -785,8 +831,10 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       $("oCut").innerHTML = "&mdash;"; $("oCutD").textContent = "";
       $("oRows").innerHTML = ""; $("oRoll").hidden = true; $("oHint").textContent = "";
       $("svg").innerHTML = "";
+      $("tutBtn").hidden = true; $("tutBar").hidden = true; $("tutText").hidden = true;
       return;
     }
+    if(!r.owl){ $("tutBtn").hidden = true; $("tutBar").hidden = true; $("tutText").hidden = true; tutOn = false; }
     throatTipTxt();
 
     if(r.owl){
@@ -798,15 +846,22 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
         ["Cut angle", (r.a*180/Math.PI).toFixed(1) + "\u00B0 off square"],
         ["Duct turns", r.angDeg.toFixed(1) + "\u00B0 and back"],
         ["Middle piece", frac(r.M) + " \u2014 the flip"],
-        ["Straight each end", frac(r.endAllow)],
+        ["Free straight from the miter", frac(r.freeStraight)],
+        ["Straight each end", frac(r.endAllow) + (r.needExtra ? " (extra)" : " \u2014 covered")],
         ["Cut from stock", frac(r.stock)],
         ["Finished run", frac(r.endLen)],
         ["Length lost", frac(r.lost)]
       ]);
-      $("owlSteps").hidden = false;
-      setOwlSteps(r);
+      tutR = r;
+      $("tutBtn").hidden = tutOn;
+      $("tutBar").hidden = !tutOn;
+      $("tutText").hidden = !tutOn;
+      $("owlSteps").hidden = tutOn;
+      if(tutOn) tutRender(); else setOwlSteps(r);
       $("oRoll").hidden = true;
-      $("oHint").innerHTML = "The mark is how far the diagonal walks across the cheek \u2014 square line at the top corner, " + frac(r.mark) + " over at the bottom.";
+      $("oHint").innerHTML = r.needExtra
+        ? "The angled cut already leaves <b>" + frac(r.freeStraight) + "</b> of straight at each corner. Your connection wants more, so keep the <b>" + frac(r.endAllow) + "</b> collar."
+        : "The angled cut leaves <b>" + frac(r.freeStraight) + "</b> of straight at each corner \u2014 that already covers your <b>" + frac(r.endAllow) + "</b> connection, so you can drop the collar to 0 and cut it straight through if you want.";
       draw(r);
       return;
     }
@@ -888,85 +943,102 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
 
     if(r.owl){
       // schematic — fixed proportions, real numbers labeled. Never to scale.
+      // tutStep 0 = show everything; 1..6 = reveal progressively.
+      var S = (typeof tutStep === "number" && tutOn) ? tutStep : 0;
+      var showAll = (S === 0);
+      function on(n){ return showAll || S >= n; }
+      function only(n){ return showAll || S === n; }
+
       var midW = 196, endW = 52, cheekH = 40, lean = 17, riseTop = 26;
       var Lx = 46;
       var x0 = Lx, xC1 = x0 + endW, xC2 = xC1 + midW, xEnd = xC2 + endW;
       var yTop = 100;
       var half = cheekH/2, tY = yTop-half, bY = yTop+half;
-
-      // ---- header + full-stock dimension ----
-      var stockLbl = (r.lenMode === "stock") ? "CUT A " + frac(r.stock) + " STICK" : "START WITH A " + frac(r.stock) + " STICK";
-      txt(x0, 44, stockLbl, "start", true, "#030D8C");
-      txt(x0, 59, "two cuts, mirror image \u2014 flip the middle", "start", false, "#54646F");
-      dimline(x0, 74, xEnd, 74);
-      txt((x0+xEnd)/2, 70, frac(r.stock) + (r.lenMode==="stock" ? " on hand" : " to cut"), "middle", false, "#0F1A22");
-
-      // ---- three sections, each a filled polygon split by the mirrored cuts ----
-      // cut1 leans "\" : top at xC1, bottom at xC1+lean.  cut2 leans "/" : top at xC2, bottom at xC2-lean.
       var a_t = xC1, a_b = xC1 + lean, b_t = xC2, b_b = xC2 - lean;
-      function poly(pts, fill){
-        g.push('<polygon points="' + pts.map(function(q){return q[0]+","+q[1];}).join(" ") + '" fill="' + fill + '" stroke="#9AA7B1" stroke-width="1.5"/>');
-      }
-      poly([[x0,tY],[a_t,tY],[a_b,bY],[x0,bY]], "#EAF0FF");                 // END A (keep)
-      poly([[a_t,tY],[b_t,tY],[b_b,bY],[a_b,bY]], "#FFE9DC");              // MIDDLE (flip)
-      poly([[b_t,tY],[xEnd,tY],[xEnd,bY],[b_b,bY]], "#EAF0FF");           // END B (keep)
-      // outer duct outline
-      g.push('<rect x="' + x0 + '" y="' + tY + '" width="' + (xEnd-x0) + '" height="' + cheekH + '" fill="none" stroke="#54646F" stroke-width="2"/>');
-      // the two mirrored cut lines
-      g.push('<line x1="' + a_t + '" y1="' + tY + '" x2="' + a_b + '" y2="' + bY + '" stroke="#B3541E" stroke-width="2.6"/>');
-      g.push('<line x1="' + b_t + '" y1="' + tY + '" x2="' + b_b + '" y2="' + bY + '" stroke="#B3541E" stroke-width="2.6"/>');
-      // connection markers at the very ends
-      [[x0,1],[xEnd,-1]].forEach(function(ff){
-        var xx = ff[0], dir = ff[1];
-        if(r.tdc) g.push('<rect x="' + (xx-3) + '" y="' + (tY-5) + '" width="6" height="' + (cheekH+10) + '" fill="#030D8C"/>');
-        else for(var k=-1;k<=1;k++) g.push('<line x1="' + xx + '" y1="' + (yTop+k*cheekH/4) + '" x2="' + (xx+dir*6) + '" y2="' + (yTop+k*cheekH/4) + '" stroke="#030D8C" stroke-width="1.8"/>');
-      });
-      // section labels inside each zone
-      txt((x0+a_t)/2, yTop-3, "END", "middle", false, "#3A4A8C");
-      txt((x0+a_t)/2, yTop+11, "keep", "middle", false, "#3A4A8C");
-      txt((a_t+b_t)/2, yTop-3, "MIDDLE", "middle", true, "#B3541E");
-      txt((a_t+b_t)/2, yTop+12, "flip it", "middle", false, "#B3541E");
-      txt((b_t+xEnd)/2, yTop-3, "END", "middle", false, "#3A4A8C");
-      txt((b_t+xEnd)/2, yTop+11, "keep", "middle", false, "#3A4A8C");
-      // middle length dim below
-      var mDim = bY + 16;
-      dimline(a_t, mDim, b_t, mDim);
-      txt((a_t+b_t)/2, mDim+13, "middle " + frac(r.M));
-      // keep-each-end dim
-      dimline(x0, mDim, a_t, mDim);
-      txt((x0+a_t)/2, mDim+13, "keep " + frac(r.endAllow), "middle", false, "#030D8C");
-      dimline(b_t, mDim, xEnd, mDim);
-      txt((b_t+xEnd)/2, mDim+13, "keep " + frac(r.endAllow), "middle", false, "#030D8C");
-      // mark dim (the diagonal walk on cut 1)
-      var kDim = mDim + 26;
-      dimline(a_t, kDim, a_b, kDim);
-      txt(a_b+5, kDim+4, "cut mark " + frac(r.mark) + " (each cut, opposite hands)", "start", true);
 
-      // ---- after the flip ----
-      var bHdr = kDim + 42;
-      var bx0 = Lx, bx1 = bx0 + endW, bx2 = bx1 + midW, bx3 = bx2 + endW;
-      var cyLo = bHdr + 34 + riseTop, cyHi = cyLo - riseTop;
-      var finLbl = (r.lenMode === "end") ? "FINISHES AT " + frac(r.endLen) + " \u2014 what you asked" : "FINISHES AT " + frac(r.endLen);
-      txt(bx0, bHdr, finLbl, "start", true, "#030D8C");
-      txt(bx0, bHdr+15, "after the flip", "start", false, "#54646F");
-      function seg(x1,y1,x2,y2){
-        g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#9AA7B1" stroke-width="' + cheekH + '" stroke-linecap="butt"/>');
-        g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#EAF0FF" stroke-width="' + (cheekH-4) + '" stroke-linecap="butt"/>');
+      // ---- header + full-stock dimension (step 1+) ----
+      var stockLbl = (r.lenMode === "stock") ? "CUT A " + frac(r.stock) + " STICK" : "START WITH A " + frac(r.stock) + " STICK";
+      if(on(1)){
+        txt(x0, 44, stockLbl, "start", true, "#030D8C");
+        if(!tutOn) txt(x0, 59, "two cuts, mirror image \u2014 flip the middle", "start", false, "#54646F");
+        dimline(x0, 74, xEnd, 74);
+        txt((x0+xEnd)/2, 70, frac(r.stock) + (r.lenMode==="stock" ? " on hand" : " to cut"), "middle", false, "#0F1A22");
       }
-      seg(bx0, cyLo, bx1, cyLo);
-      seg(bx1, cyLo, bx2, cyHi);
-      seg(bx2, cyHi, bx3, cyHi);
-      g.push('<path d="M' + bx0 + ',' + cyLo + 'L' + bx1 + ',' + cyLo + 'L' + bx2 + ',' + cyHi + 'L' + bx3 + ',' + cyHi + '" fill="none" stroke="#030D8C" stroke-width="1.6" stroke-dasharray="7 4"/>');
-      g.push('<line x1="' + (bx0-16) + '" y1="' + cyLo + '" x2="' + (bx0-16) + '" y2="' + cyHi + '" stroke="#0F1A22" stroke-width="1"/>');
-      [[cyLo],[cyHi]].forEach(function(yy){ g.push('<line x1="' + (bx0-19) + '" y1="' + yy[0] + '" x2="' + (bx0-13) + '" y2="' + yy[0] + '" stroke="#0F1A22" stroke-width="1"/>'); });
-      txt(bx0-22, (cyLo+cyHi)/2+4, frac(r.O), "end", true, "#030D8C");
-      txt((bx1+bx2)/2, cyLo+cheekH/2+2, r.angDeg.toFixed(1) + "\u00B0", "middle");
-      var fDim = cyLo + cheekH/2 + 16;
-      dimline(bx0, fDim, bx3, fDim);
-      txt((bx0+bx3)/2, fDim+13, frac(r.endLen) + " end to end", "middle", false, "#0F1A22");
+
+      // ---- plain duct body (step 1+) ----
+      if(on(1)) g.push('<rect x="' + x0 + '" y="' + tY + '" width="' + (xEnd-x0) + '" height="' + cheekH + '" fill="#F0F2F4" stroke="#54646F" stroke-width="2"/>');
+
+      // ---- connection collars marked (step 2) ----
+      if(on(2)){
+        [[x0,1,a_t],[xEnd,-1,b_t]].forEach(function(ff){
+          var xx = ff[0], dir = ff[1];
+          g.push('<rect x="' + (dir>0?x0:b_t) + '" y="' + tY + '" width="' + endW + '" height="' + cheekH + '" fill="#EAF0FF"/>');
+          if(r.tdc) g.push('<rect x="' + (xx-3) + '" y="' + (tY-5) + '" width="6" height="' + (cheekH+10) + '" fill="#030D8C"/>');
+          else for(var k=-1;k<=1;k++) g.push('<line x1="' + xx + '" y1="' + (yTop+k*cheekH/4) + '" x2="' + (xx+dir*6) + '" y2="' + (yTop+k*cheekH/4) + '" stroke="#030D8C" stroke-width="1.8"/>');
+        });
+        g.push('<rect x="' + x0 + '" y="' + tY + '" width="' + (xEnd-x0) + '" height="' + cheekH + '" fill="none" stroke="#54646F" stroke-width="2"/>');
+        dimline(x0, bY+16, a_t, bY+16);
+        txt((x0+a_t)/2, bY+29, "keep " + frac(r.endAllow), "middle", false, "#030D8C");
+        dimline(b_t, bY+16, xEnd, bY+16);
+        txt((b_t+xEnd)/2, bY+29, "keep " + frac(r.endAllow), "middle", false, "#030D8C");
+      }
+
+      // ---- first cut (step 3) ----
+      if(on(3)){
+        g.push('<line x1="' + a_t + '" y1="' + tY + '" x2="' + a_b + '" y2="' + bY + '" stroke="#B3541E" stroke-width="2.8"/>');
+        dimline(a_t, tY-12, a_b, tY-12);
+        txt((a_t+a_b)/2, tY-16, "mark " + frac(r.mark), "middle", true);
+      }
+      // ---- second cut, mirrored (step 4) ----
+      if(on(4)){
+        g.push('<line x1="' + b_t + '" y1="' + tY + '" x2="' + b_b + '" y2="' + bY + '" stroke="#B3541E" stroke-width="2.8"/>');
+        txt((b_t+b_b)/2 + 14, bY-6, "mirror", "start", false, "#B3541E");
+      }
+
+      // ---- three sections shaded + labeled (step 5) ----
+      if(on(5)){
+        function poly(pts, fill){ g.push('<polygon points="' + pts.map(function(q){return q[0]+","+q[1];}).join(" ") + '" fill="' + fill + '" stroke="none"/>'); }
+        poly([[x0,tY],[a_t,tY],[a_b,bY],[x0,bY]], "#EAF0FF");
+        poly([[a_t,tY],[b_t,tY],[b_b,bY],[a_b,bY]], "#FFE0CC");
+        poly([[b_t,tY],[xEnd,tY],[xEnd,bY],[b_b,bY]], "#EAF0FF");
+        // redraw outline + cuts on top of fills
+        g.push('<rect x="' + x0 + '" y="' + tY + '" width="' + (xEnd-x0) + '" height="' + cheekH + '" fill="none" stroke="#54646F" stroke-width="2"/>');
+        g.push('<line x1="' + a_t + '" y1="' + tY + '" x2="' + a_b + '" y2="' + bY + '" stroke="#B3541E" stroke-width="2.8"/>');
+        g.push('<line x1="' + b_t + '" y1="' + tY + '" x2="' + b_b + '" y2="' + bY + '" stroke="#B3541E" stroke-width="2.8"/>');
+        txt((x0+a_t)/2, yTop+4, "KEEP", "middle", false, "#3A4A8C");
+        txt((a_t+b_t)/2, yTop-2, "MIDDLE", "middle", true, "#B3541E");
+        txt((a_t+b_t)/2, yTop+13, "flips", "middle", false, "#B3541E");
+        txt((b_t+xEnd)/2, yTop+4, "KEEP", "middle", false, "#3A4A8C");
+        dimline(a_t, bY+16, b_t, bY+16);
+        txt((a_t+b_t)/2, bY+29, "middle " + frac(r.M), "middle", false, "#0F1A22");
+      }
+
+      // ---- after the flip (step 6) — full Z ----
+      if(on(6)){
+        var bHdr = bY + 58;
+        var bx0 = Lx, bx1 = bx0 + endW, bx2 = bx1 + midW, bx3 = bx2 + endW;
+        var cyLo = bHdr + 34 + riseTop, cyHi = cyLo - riseTop;
+        var finLbl = (r.lenMode === "end") ? "FINISHES AT " + frac(r.endLen) + " \u2014 what you asked" : "FINISHES AT " + frac(r.endLen);
+        txt(bx0, bHdr, finLbl, "start", true, "#030D8C");
+        txt(bx0, bHdr+15, "after the flip", "start", false, "#54646F");
+        function seg(x1,y1,x2,y2){
+          g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#9AA7B1" stroke-width="' + cheekH + '" stroke-linecap="butt"/>');
+          g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#EAF0FF" stroke-width="' + (cheekH-4) + '" stroke-linecap="butt"/>');
+        }
+        seg(bx0, cyLo, bx1, cyLo); seg(bx1, cyLo, bx2, cyHi); seg(bx2, cyHi, bx3, cyHi);
+        g.push('<path d="M' + bx0 + ',' + cyLo + 'L' + bx1 + ',' + cyLo + 'L' + bx2 + ',' + cyHi + 'L' + bx3 + ',' + cyHi + '" fill="none" stroke="#030D8C" stroke-width="1.6" stroke-dasharray="7 4"/>');
+        g.push('<line x1="' + (bx0-16) + '" y1="' + cyLo + '" x2="' + (bx0-16) + '" y2="' + cyHi + '" stroke="#0F1A22" stroke-width="1"/>');
+        [[cyLo],[cyHi]].forEach(function(yy){ g.push('<line x1="' + (bx0-19) + '" y1="' + yy[0] + '" x2="' + (bx0-13) + '" y2="' + yy[0] + '" stroke="#0F1A22" stroke-width="1"/>'); });
+        txt(bx0-22, (cyLo+cyHi)/2+4, frac(r.O), "end", true, "#030D8C");
+        txt((bx1+bx2)/2, cyLo+cheekH/2+2, r.angDeg.toFixed(1) + "\u00B0", "middle");
+        var fDim2 = cyLo + cheekH/2 + 16;
+        dimline(bx0, fDim2, bx3, fDim2);
+        txt((bx0+bx3)/2, fDim2+13, frac(r.endLen) + " end to end", "middle", false, "#0F1A22");
+      }
 
       var svg0 = $("svg");
-      svg0.setAttribute("viewBox", "0 30 " + (xEnd + 40) + " " + (fDim + 26 - 30));
+      var vbH = on(6) ? 300 : 150;
+      svg0.setAttribute("viewBox", "0 30 " + (xEnd + 40) + " " + vbH);
       svg0.innerHTML = g.join("");
       return;
     }
@@ -1154,6 +1226,13 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     c.addEventListener("click", function(){ go(c.dataset.go); });
   });
   $("homeBtn").addEventListener("click", function(){ go("home"); });
+
+  $("tutBtn").addEventListener("click", function(){ tutOn = true; tutStep = 1; offPaint(); });
+  $("tutNext").addEventListener("click", function(){
+    if(tutStep >= 6){ tutOn = false; offPaint(); return; }
+    tutStep++; tutRender();
+  });
+  $("tutPrev").addEventListener("click", function(){ if(tutStep > 1){ tutStep--; tutRender(); } });
 
   syncAng();
   syncFit();
