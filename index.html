@@ -85,6 +85,10 @@ body{
 .cutbig .cutd{font-size:15px;color:var(--ink-soft);font-weight:400;margin-left:10px}
 .cutrows{margin-top:12px;border-top:1px solid var(--rule)}
 .cutrows .cr{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #E2E7EA;font-family:var(--mono);font-size:15px}
+.out.skew{border-left-color:var(--brand);margin-top:12px}
+.out.skew .r{font-size:17px;color:var(--brand);font-family:var(--cond);font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.out.skew .s{font-family:var(--body);font-size:15px;line-height:1.5;margin-top:6px}
+.out.skew .s b{font-family:var(--mono);color:var(--ink)}
 .tut{width:100%;min-height:56px;border:2px solid var(--brand);background:var(--brand);color:#fff;border-radius:3px;cursor:pointer;
   font-family:var(--cond);font-size:19px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-top:6px}
 .tut:active{background:#02096b}
@@ -358,6 +362,10 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     <h2 id="cutTitle">Your cut</h2>
     <div class="cutbig"><span id="oCut">&mdash;</span><span class="cutd" id="oCutD"></span></div>
     <div class="cutrows" id="oRows"></div>
+    <div class="out skew" id="skewCard" hidden>
+      <div class="r" id="skewHead">No-cut option</div>
+      <div class="s" id="skewBody"></div>
+    </div>
     <div class="roll" id="oRoll" hidden></div>
     <button type="button" class="tut" id="tutBtn" hidden>&#9654;&ensp;Walk me through the cuts</button>
     <div class="tutbar" id="tutBar" hidden>
@@ -365,6 +373,7 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       <div class="tutstep" id="tutStep">Step 1 of 6</div>
       <button type="button" id="tutNext">Next &#8250;</button>
     </div>
+    <div class="dia" id="tutDia" hidden><svg id="tutSvg" viewBox="0 30 420 150" aria-label="Tutorial diagram"></svg></div>
     <p class="tuttext" id="tutText" hidden></p>
     <ol class="steps" id="owlSteps" hidden>
       <li>Square a line around the duct at each end of the middle piece.</li>
@@ -644,7 +653,7 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
     $("tutText").innerHTML = tutTextFor(tutStep, tutR);
     $("tutPrev").disabled = tutStep <= 1;
     $("tutNext").textContent = tutStep >= 6 ? "Done" : "Next ›";
-    draw(tutR);
+    owlDraw(tutR, tutStep, $("tutSvg"));
   }
   var ANGLES = [22.5, 30, 45, 60, 90];
   var WYE_LEN = {6:12,8:16,10:20,12:22,14:24,16:28,18:30,20:32,22:36,24:38,26:42,28:44};
@@ -737,11 +746,22 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       var s0 = owlSolve(lenMode, Ln, Oo, 0);
       var freeStraight = s0 ? Hc*Math.tan(s0.a) : Hc*Math.tan(s.a);
       var needExtra = e > freeStraight + 1e-6;
+      // no-cut skew: install the straight stick at an angle, no cuts at all
+      var skew = null;
+      if(lenMode === "stock"){
+        if(Oo < Ln){
+          var ts = Math.asin(Oo/Ln);
+          skew = { deg:ts*180/Math.PI, gap:Hc*Math.tan(ts), stick:Ln, covers:Ln*Math.cos(ts) };
+        }
+      } else {
+        var ts2 = Math.atan2(Oo, Ln);
+        skew = { deg:ts2*180/Math.PI, gap:Hc*Math.tan(ts2), stick:Math.sqrt(Ln*Ln+Oo*Oo), covers:Ln };
+      }
       return { owl:true, Hc:Hc, O:Oo, M:s.M, th:s.th, a:s.a,
                mark:Hc*Math.tan(s.a), runM:s.M*Math.cos(s.th), lost:s.lost,
                angDeg:s.th*180/Math.PI, lenMode:lenMode, stock:s.stock, endLen:s.endLen,
                tdc:(off.endConn === "tdc"), endAllow:e,
-               freeStraight:freeStraight, needExtra:needExtra };
+               freeStraight:freeStraight, needExtra:needExtra, skew:skew };
     }
 
     var angDeg = num("oAng");
@@ -832,9 +852,10 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
       $("oRows").innerHTML = ""; $("oRoll").hidden = true; $("oHint").textContent = "";
       $("svg").innerHTML = "";
       $("tutBtn").hidden = true; $("tutBar").hidden = true; $("tutText").hidden = true;
+      $("tutDia").hidden = true; $("skewCard").hidden = true;
       return;
     }
-    if(!r.owl){ $("tutBtn").hidden = true; $("tutBar").hidden = true; $("tutText").hidden = true; tutOn = false; }
+    if(!r.owl){ $("tutBtn").hidden = true; $("tutBar").hidden = true; $("tutText").hidden = true; $("tutDia").hidden = true; $("skewCard").hidden = true; tutOn = false; }
     throatTipTxt();
 
     if(r.owl){
@@ -852,9 +873,25 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
         ["Finished run", frac(r.endLen)],
         ["Length lost", frac(r.lost)]
       ]);
+      if(r.skew){
+        var sk = r.skew, verdict;
+        if(sk.deg <= 2) verdict = "That's nothing \u2014 either connection pulls it up. <b>Don't cut anything.</b>";
+        else if(sk.deg <= 5) verdict = r.tdc
+          ? "S&drive would pull that; a TDC gasket is fighting it. Your call."
+          : "An S&drive will pull that up. <b>Probably skip the cuts.</b>";
+        else verdict = "Too far out of square to fudge \u2014 cut the offset.";
+        $("skewCard").hidden = false;
+        $("skewHead").textContent = "No-cut option \u2014 run it skewed";
+        $("skewBody").innerHTML =
+          "Install " + (r.lenMode === "stock" ? "your <b>" + frac(sk.stick) + "</b> stick" : "a <b>" + frac(sk.stick) + "</b> stick") +
+          " tilted <b>" + sk.deg.toFixed(1) + "\u00B0</b> \u2014 no cuts. It steps over " + frac(r.O) +
+          " and covers <b>" + frac(sk.covers) + "</b> of run. The ends sit <b>" + frac(sk.gap) +
+          "</b> out of square across the " + frac(r.Hc) + " side. " + verdict;
+      } else { $("skewCard").hidden = true; }
       tutR = r;
       $("tutBtn").hidden = tutOn;
       $("tutBar").hidden = !tutOn;
+      $("tutDia").hidden = !tutOn;
       $("tutText").hidden = !tutOn;
       $("owlSteps").hidden = tutOn;
       if(tutOn) tutRender(); else setOwlSteps(r);
@@ -911,40 +948,22 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
   }
 
   /* ---------- diagrams ---------- */
-  function draw(r){
-    var W = 400, Ht = 260, pad = 34;
-    var g = [], sc, ox, oy;
-    function X(x){ return ox + x*sc; }
-    var square = (off.fit === "twoS" || off.fit === "owl");
-    function duct(d, size){
-      var wpx = Math.max(4, size*sc);
-      g.push('<path d="' + d + '" fill="none" stroke="#9AA7B1" stroke-width="' + wpx + '" stroke-linecap="butt"/>');
-      if(square){
-        g.push('<path d="' + d + '" fill="none" stroke="#F4F6F8" stroke-width="' + Math.max(1,wpx-5) + '" stroke-linecap="butt"/>');
-      } else {
-        g.push('<path d="' + d + '" fill="none" stroke="#C9D1D6" stroke-width="' + Math.max(1,wpx-2.5) + '" stroke-linecap="butt"/>');
-        g.push('<path d="' + d + '" fill="none" stroke="#E9EDF0" stroke-width="' + Math.max(1,wpx*0.30) + '" stroke-linecap="butt"/>');
+  function owlDraw(r, S, svgEl){
+      var g = [];
+      function txt(px,py,t,anchor,big,color){
+        g.push('<text x="' + px + '" y="' + py + '" text-anchor="' + (anchor||"middle") +
+          '" font-family="monospace" font-size="' + (big?12.5:10.5) + '"' +
+          (big?' font-weight="bold"':'') + ' fill="' + (color||(big?"#B3541E":"#0F1A22")) + '">' + t + '</text>');
       }
-    }
-    function cl(d){ g.push('<path d="' + d + '" fill="none" stroke="#030D8C" stroke-width="1.5" stroke-dasharray="7 4"/>'); }
-    function dot(px,py){ g.push('<circle cx="' + px + '" cy="' + py + '" r="2.7" fill="#FF6A13"/>'); }
-    function txt(px,py,t,anchor,big,color){
-      g.push('<text x="' + px + '" y="' + py + '" text-anchor="' + (anchor||"middle") +
-        '" font-family="monospace" font-size="' + (big?12.5:10.5) + '"' +
-        (big?' font-weight="bold"':'') + ' fill="' + (color||(big?"#B3541E":"#0F1A22")) + '">' + t + '</text>');
-    }
-    function dimline(x1,y1,x2,y2){
-      g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#0F1A22" stroke-width="1"/>');
-      var vx = (y2-y1), vy = -(x2-x1), L = Math.hypot(vx,vy)||1; vx/=L; vy/=L;
-      [[x1,y1],[x2,y2]].forEach(function(p){
-        g.push('<line x1="' + (p[0]-vx*4) + '" y1="' + (p[1]-vy*4) + '" x2="' + (p[0]+vx*4) + '" y2="' + (p[1]+vy*4) + '" stroke="#0F1A22" stroke-width="1"/>');
-      });
-    }
-
-    if(r.owl){
+      function dimline(x1,y1,x2,y2){
+        g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#0F1A22" stroke-width="1"/>');
+        var vx = (y2-y1), vy = -(x2-x1), L = Math.hypot(vx,vy)||1; vx/=L; vy/=L;
+        [[x1,y1],[x2,y2]].forEach(function(pp){
+          g.push('<line x1="' + (pp[0]-vx*4) + '" y1="' + (pp[1]-vy*4) + '" x2="' + (pp[0]+vx*4) + '" y2="' + (pp[1]+vy*4) + '" stroke="#0F1A22" stroke-width="1"/>');
+        });
+      }
       // schematic — fixed proportions, real numbers labeled. Never to scale.
-      // tutStep 0 = show everything; 1..6 = reveal progressively.
-      var S = (typeof tutStep === "number" && tutOn) ? tutStep : 0;
+      // S = 0 shows everything; 1..6 reveal progressively.
       var showAll = (S === 0);
       function on(n){ return showAll || S >= n; }
       function only(n){ return showAll || S === n; }
@@ -1036,12 +1055,42 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
         txt((bx0+bx3)/2, fDim2+13, frac(r.endLen) + " end to end", "middle", false, "#0F1A22");
       }
 
-      var svg0 = $("svg");
       var vbH = on(6) ? 300 : 150;
-      svg0.setAttribute("viewBox", "0 30 " + (xEnd + 40) + " " + vbH);
-      svg0.innerHTML = g.join("");
-      return;
+      svgEl.setAttribute("viewBox", "0 30 " + (xEnd + 40) + " " + vbH);
+      svgEl.innerHTML = g.join("");
+  }
+
+  function draw(r){
+    var W = 400, Ht = 260, pad = 34;
+    var g = [], sc, ox, oy;
+    function X(x){ return ox + x*sc; }
+    var square = (off.fit === "twoS" || off.fit === "owl");
+    function duct(d, size){
+      var wpx = Math.max(4, size*sc);
+      g.push('<path d="' + d + '" fill="none" stroke="#9AA7B1" stroke-width="' + wpx + '" stroke-linecap="butt"/>');
+      if(square){
+        g.push('<path d="' + d + '" fill="none" stroke="#F4F6F8" stroke-width="' + Math.max(1,wpx-5) + '" stroke-linecap="butt"/>');
+      } else {
+        g.push('<path d="' + d + '" fill="none" stroke="#C9D1D6" stroke-width="' + Math.max(1,wpx-2.5) + '" stroke-linecap="butt"/>');
+        g.push('<path d="' + d + '" fill="none" stroke="#E9EDF0" stroke-width="' + Math.max(1,wpx*0.30) + '" stroke-linecap="butt"/>');
+      }
     }
+    function cl(d){ g.push('<path d="' + d + '" fill="none" stroke="#030D8C" stroke-width="1.5" stroke-dasharray="7 4"/>'); }
+    function dot(px,py){ g.push('<circle cx="' + px + '" cy="' + py + '" r="2.7" fill="#FF6A13"/>'); }
+    function txt(px,py,t,anchor,big,color){
+      g.push('<text x="' + px + '" y="' + py + '" text-anchor="' + (anchor||"middle") +
+        '" font-family="monospace" font-size="' + (big?12.5:10.5) + '"' +
+        (big?' font-weight="bold"':'') + ' fill="' + (color||(big?"#B3541E":"#0F1A22")) + '">' + t + '</text>');
+    }
+    function dimline(x1,y1,x2,y2){
+      g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#0F1A22" stroke-width="1"/>');
+      var vx = (y2-y1), vy = -(x2-x1), L = Math.hypot(vx,vy)||1; vx/=L; vy/=L;
+      [[x1,y1],[x2,y2]].forEach(function(p){
+        g.push('<line x1="' + (p[0]-vx*4) + '" y1="' + (p[1]-vy*4) + '" x2="' + (p[0]+vx*4) + '" y2="' + (p[1]+vy*4) + '" stroke="#0F1A22" stroke-width="1"/>');
+      });
+    }
+
+    if(r.owl){ owlDraw(r, 0, $("svg")); return; }
 
     var th = r.th, O = r.O;
     if(off.fit === "wye" || off.fit === "single"){
